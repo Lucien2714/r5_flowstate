@@ -64,6 +64,9 @@ global function TrackerUtilityInit
 global function IsMapPlaylistGamemodeRotationEnabled
 global function DecideNextMapPlaylistGamemodeRotation
 
+// PWLA server util
+global function RuleReminders_Init
+
 #if DEVELOPER
 	global function RegExpUnitTest
 	global function RegExpUnitTest2
@@ -3586,4 +3589,42 @@ void function DecideNextMapPlaylistGamemodeRotation()
 bool function IsMapPlaylistGamemodeRotationEnabled()
 {
 	return file.bAutoRotationEnabled
+}
+void function RuleReminder(int total_msg, int interval, int duration){
+	if(interval<=0){
+		sqerror("RuleReminder: Invalid interval value:", interval)
+		return
+	}
+	while(true){
+		sqprint("RuleReminder: Started with", total_msg, "messages at", interval, "second intervals for", duration, "seconds each.", "game state:",GetGameState())
+		if(GamePlaying()){
+			if(total_msg<=0 || interval<=0){
+				return
+			}
+			int current_message=RandomIntRange(1,total_msg)
+			foreach ( say_to_player in GetPlayerArray())
+			{
+				try	
+				{	
+					Message( say_to_player, "#REMINDER_H", format("REMINDER_%d_C",current_message), 10 )	
+				} 
+				catch ( errc )
+				{		
+					sqwarning( "RuleReminder: Failed to send message with error:", errc )
+				}
+			}
+		}
+		wait(interval)
+	}
+	
+}
+void function RuleReminders_Init(){
+	sqprint("RuleReminders_Init: Checking if reminders are enabled for playlist:", GetCurrentPlaylistName(), "reminder_on =", GetPlaylistVarBool( GetCurrentPlaylistName(), "reminder_on", false ))
+	if(!GetPlaylistVarBool( GetCurrentPlaylistName(), "reminder_on", false )){
+		return
+	}
+	int total_messages=GetPlaylistVarInt( GetCurrentPlaylistName(), "reminder_message_count", 0 )
+	int interval=GetPlaylistVarInt( GetCurrentPlaylistName(), "reminder_message_interval", 60 )
+	int duration=GetPlaylistVarInt( GetCurrentPlaylistName(), "reminder_message_duration", 10 )
+	thread RuleReminder(total_messages, interval, duration)
 }
