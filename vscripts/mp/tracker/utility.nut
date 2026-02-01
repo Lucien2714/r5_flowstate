@@ -3602,6 +3602,7 @@ void function RuleReminder(int total_msg, int interval, int duration){
 				return
 			}
 			int current_message=RandomIntRange(1,total_msg)
+			sqprint("RuleReminder: Sending message REMINDER_",current_message,"_C to all players.")
 			foreach ( say_to_player in GetPlayerArray())
 			{
 				try	
