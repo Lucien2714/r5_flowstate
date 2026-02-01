@@ -1,0 +1,21 @@
+"mod"
+{
+	"name" "Karma Assets"
+	"id" "Karma"
+	"description" "Houses custom assets for Karma servers"
+	"version" "1.1"
+	"author" "mkos"
+
+	"LocalizationFiles"
+	{
+		// "resource/karma_%language%.txt" "1"
+	}
+
+	"PakLoadOnPlaylists"
+	{
+	}
+
+	"ConVars"
+	{
+	}
+}

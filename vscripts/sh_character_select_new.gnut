@@ -3338,10 +3338,22 @@ void function DebugMenuThink()
 #endif //CLIENT
 
 #if SERVER
-bool function CharacterSelect_AssignCharacter( entity player, ItemFlavor character, bool updateLoadoutSlot = true )
+bool function CharacterSelect_AssignCharacter( entity player, ItemFlavor character, bool updateLoadoutSlot = true, bool takeAllPassives = true )
 {
-	TakeAllPassives( player )
+	/*
+		(mk):
+		
+		if the player has a character with passives and this function runs again for that same character, due to
+		"ItemFlavor_GetHumanReadableRef( playerCharacter ) != ItemFlavor_GetHumanReadableRef( character ) )"
+		their passive will be taken without being given again.
+		Due to the amount of cross referencing required to place 'TakeAllPassives' within the 'updateLoadoutSlot if condition' below, 
+		I am temporarily placing an optional bool that defaults to true to change removing passive behavior, to prevent the edge case where other code expects 
+		passives to be removed regardless of loadout slot being applied or not.
+	*/
 	
+	if( takeAllPassives )
+		TakeAllPassives( player ) 
+
 	ItemFlavor playerCharacter = LoadoutSlot_GetItemFlavor( ToEHI( player ), Loadout_CharacterClass() )
 	
 	if ( updateLoadoutSlot && ItemFlavor_GetHumanReadableRef( playerCharacter ) != ItemFlavor_GetHumanReadableRef( character ) )

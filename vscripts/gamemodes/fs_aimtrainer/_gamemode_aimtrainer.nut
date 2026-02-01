@@ -3147,11 +3147,12 @@ bool function CC_AimTrainer_CloseWeaponSelector(entity player, array<string> arg
 
 bool function CC_MenuGiveAimTrainerWeapon( entity player, array<string> args )
 {
-	if(!IsValid(player) || args.len() < 2) return false
+	if( !IsValid( player ) || args.len() < 2 ) 
+		return false
 	
-	string weapon = args[0]
+	string weapon = args[ 0 ]	
+	bool bGiveAndSaveNow = g_bIs1v1GameType() || Playlist() == ePlaylists.fs_realistic_ttv //idc, conditional.
 	
-	bool bIs1v1 = g_bIs1v1GameType() //idc, conditional.	
 	if( Gamemode() != eGamemodes.fs_aimtrainer && !ValidateWeaponTgiveSettings( player, args[0] ) || Gamemode() == eGamemodes.WINTEREXPRESS && !player.GetPlayerNetBool( "WinterExpress_IsPlayerAllowedLegendChange" ) )
 		return true
 	
@@ -3507,7 +3508,7 @@ bool function CC_MenuGiveAimTrainerWeapon( entity player, array<string> args )
 			foreach (mod in mods1)
 				optics1 = mod + " " + optics1
 			
-			weaponname1 = "tgive p " + weapon1 + " " + optics1 + ( bIs1v1 ? "" : "; " )		
+			weaponname1 = "tgive p " + weapon1 + " " + optics1 + ( bGiveAndSaveNow ? "" : "; " )		
 		}
 		
 		if( weapon2 != "" ) // Secondary Slot
@@ -3519,7 +3520,7 @@ bool function CC_MenuGiveAimTrainerWeapon( entity player, array<string> args )
 			weaponname2 = "tgive s " + weapon2 + " " + optics2
 		}
 
-		if( bIs1v1 ) 
+		if( bGiveAndSaveNow ) 
 		{			
 			array<string> wep1Array = split( weaponname1, " " )
 		
@@ -3549,7 +3550,7 @@ bool function CC_MenuGiveAimTrainerWeapon( entity player, array<string> args )
 				}
 			}
 		}
-		else 
+		else
 		{
 			weaponlist[ player.GetPlayerName() ] <- weaponname1 + weaponname2
 		}

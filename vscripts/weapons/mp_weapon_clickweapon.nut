@@ -208,10 +208,8 @@ void function LGUN_Airborne( entity player )
 	WaitFrame()
 	wait 0.1
 	
-	while( IsValid(player) && !player.IsOnGround() )
-	{
+	while( !player.IsOnGround() )
 		WaitFrame()
-	}
 }
 #endif
 
@@ -266,8 +264,8 @@ bool function LGUN_CanPlayerRailjump( entity player ) //Cafe
 	StartParticleEffectInWorld( GetParticleSystemIndex( RAIL_JUMP_ASSET ), trace.endPos, <0, 0, 0> ) //Explosion
 	
 	#if SERVER
-	player.p.railjumptimes++
-	thread LGUN_Airborne( player )
+		player.p.railjumptimes++
+		thread LGUN_Airborne( player )
 	#endif
 	
 	return true

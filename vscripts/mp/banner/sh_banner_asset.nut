@@ -238,8 +238,12 @@ void function BannerAssets_RegisterGroup( string name, LocPair groupLoc, float w
 	file.groupDataMap[ name ] <- bannerGroup
 }
 
+bool s_bAudioQueueRegistered //temp flag
 void function BannerAssets_RegisterAudioGroup( string name, bool interupt = true, LocPair ornull groupLocOrNull = null, float width = 0.1, float height = 0.1, float alpha = -1.0, float startDelay = 0, bool isVisible = true, int cycleTime = 10, bool useRandom = false, float intermediateTime = 2.00, int fadeSpeed = SLOWEST, bool isAudioQueue = true )
 {
+	if( s_bAudioQueueRegistered ) //Todo: temp.
+		mAssert( 0, "Todo(mk): Make audio queues support multiple audio groups" )
+
 	LocPair groupLoc
 	if( groupLocOrNull != null )
 		groupLoc = expect LocPair ( groupLocOrNull )
@@ -262,6 +266,8 @@ void function BannerAssets_RegisterAudioGroup( string name, bool interupt = true
 		isAudioQueue,
 		interupt
 	)
+	
+	s_bAudioQueueRegistered = true //todo: remove after compatibility.
 }
 
 void function BannerAssets_SetAllGroupsFunc( void functionref() callbackFunc )

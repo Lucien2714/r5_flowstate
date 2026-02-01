@@ -9,46 +9,46 @@ global function IsPlayerInCryptoDroneCameraView
 global function CryptoDrone_SetMaxZ
 
 #if CLIENT
-global function OnClientAnimEvent_ability_crypto_drone
-global function UpdateCameraVisibility
-global function CreateCameraCircleStatusRui
-global function DestroyCameraCircleStatusRui
-global function GetCameraCircleStatusRui
-global function CreateCryptoAnimatedTacticalRui
-global function DestroyCryptoAnimatedTacticalRui
-global function GetCryptoAnimatedTacticalRui
-global function CryptoDrone_OnPlayerTeamChanged
-global function TrackCryptoAnimatedTacticalRuiOffhandWeapon
+	global function OnClientAnimEvent_ability_crypto_drone
+	global function UpdateCameraVisibility
+	global function CreateCameraCircleStatusRui
+	global function DestroyCameraCircleStatusRui
+	global function GetCameraCircleStatusRui
+	global function CreateCryptoAnimatedTacticalRui
+	global function DestroyCryptoAnimatedTacticalRui
+	global function GetCryptoAnimatedTacticalRui
+	global function CryptoDrone_OnPlayerTeamChanged
+	global function TrackCryptoAnimatedTacticalRuiOffhandWeapon
 
-global function AddCallback_OnEnterDroneView
-global function RemoveCallback_OnEnterDroneView
-global function AddCallback_OnLeaveDroneView
-global function RemoveCallback_OnLeaveDroneView
-global function AddCallback_OnRecallDrone
-global function RemoveCallback_OnRecallDrone
+	global function AddCallback_OnEnterDroneView
+	global function RemoveCallback_OnEnterDroneView
+	global function AddCallback_OnLeaveDroneView
+	global function RemoveCallback_OnLeaveDroneView
+	global function AddCallback_OnRecallDrone
+	global function RemoveCallback_OnRecallDrone
 
-global function ServerToClient_CryptoDroneAutoReloadDone
-global function CryptoDrone_GetPlayerDrone
-global function ServerCallback_ShouldExitDrone
+	global function ServerToClient_CryptoDroneAutoReloadDone
+	global function CryptoDrone_GetPlayerDrone
+	global function ServerCallback_ShouldExitDrone
 #endif
 
 #if SERVER
-global function AddNeurolinkDetectionForPropScript
-global function RemoveNeurolinkDetectionForPropScript
-global function AddEMPDamageDevice
-global function AddEMPDestroyDevice
-global function AddEMPDestroyDeviceNoDissolve
-global function AddEMPDisableDevice
-global function GetNearbyEMPDamageDeviceArray
-global function GetNearbyEMPDestroyDeviceArray
-global function GetNearbyEMPDisableDeviceArray
-global function EMPDeviceDisableCallback
-global function CryptoDrone_GetNearbyTargetsForEMPRange
-global function CryptoDroneHideCamera
-global function CryptoDroneShowCamera
-global function Drone_ExitView
-global function SetForceExitDroneView
-global function CryptoDrone_TrySetAllowExitSpeedBoost
+	global function AddNeurolinkDetectionForPropScript
+	global function RemoveNeurolinkDetectionForPropScript
+	global function AddEMPDamageDevice
+	global function AddEMPDestroyDevice
+	global function AddEMPDestroyDeviceNoDissolve
+	global function AddEMPDisableDevice
+	global function GetNearbyEMPDamageDeviceArray
+	global function GetNearbyEMPDestroyDeviceArray
+	global function GetNearbyEMPDisableDeviceArray
+	global function EMPDeviceDisableCallback
+	global function CryptoDrone_GetNearbyTargetsForEMPRange
+	global function CryptoDroneHideCamera
+	global function CryptoDroneShowCamera
+	global function Drone_ExitView
+	global function SetForceExitDroneView
+	global function CryptoDrone_TrySetAllowExitSpeedBoost
 #endif
 
 const asset CAMERA_MODEL = $"mdl/props/crypto_drone/crypto_drone.rmdl"
@@ -123,11 +123,11 @@ global const string CRYPTO_DRONE_TARGETNAME = "drone_no_minimap_object"
 global const string DISABLE_WAYPOINT_SCRIPTNAME = "device_disable_waypoint"
 
 #if SERVER
-struct SpeedBoostStatusEffectIndexes
-{
-	int speedBoostID
-	int speedBoostVisualsID
-}
+	struct SpeedBoostStatusEffectIndexes
+	{
+		int speedBoostID
+		int speedBoostVisualsID
+	}
 #endif
       
 
@@ -179,6 +179,7 @@ struct
 	array<void functionref()> onEnterDroneViewCallbacks
 	array<void functionref()> onLeaveDroneViewCallbacks
 	array<void functionref()> onRecallDroneCallbacks
+	
 } file
 
 void function MpAbilityCryptoDrone_Init()
@@ -205,7 +206,7 @@ void function MpAbilityCryptoDrone_Init()
 	file.crypto_tactical_auto_reload_weapons = GetCurrentPlaylistVarBool( "crypto_tactical_auto_reload_weapons", true )	
 	
 	#if SERVER 
-	file.crypto_drone_upgraded_health = GetCurrentPlaylistVarInt( "crypto_drone_upgraded_health", 100 )
+		file.crypto_drone_upgraded_health = GetCurrentPlaylistVarInt( "crypto_drone_upgraded_health", 100 )	
 	#endif
 	
 	#if SERVER
@@ -256,8 +257,8 @@ void function MpAbilityCryptoDrone_Init()
 	RegisterSignal( "Crypto_StopSendPointThink" )
 
 	#if SERVER
-	// AddCallback_OnPassiveChanged( ePassives.PAS_STOWED_DRONE_SCAN, StowedDroneScan_OnPassiveChanged )
-	RegisterSignal( "RemoveStowedDrone" )
+		// AddCallback_OnPassiveChanged( ePassives.PAS_STOWED_DRONE_SCAN, StowedDroneScan_OnPassiveChanged )
+		RegisterSignal( "RemoveStowedDrone" )
 	#endif
 
 }
@@ -645,9 +646,7 @@ void function ServerCallback_ShouldExitDrone()
 	if( IsValid( player ) )
 	{
 		if( PlayerSetting_DamageClosesMenu() )
-		{
 			player.ClientCommand("ShouldExitDrone")
-		}
 	}
 }
 #endif // CLIENT
@@ -2700,6 +2699,15 @@ const PLAYER_MINS = <-16, -16, 0>
 const PLAYER_MAXS = <16, 16, 80>
 void function NeurolinkThink( entity camera, bool attachFx = true )
 {
+	if( GetCurrentPlaylistVarBool( "disable_crypto_scan", false ) )
+	{
+		#if DEVELOPER 
+			printf( "\"disable_crypto_scan\" is enabled in playlist, returning from %s()", FUNC_NAME() )
+		#endif
+		
+		return
+	}
+
 	EndSignal( camera, "OnDestroy", "FinishDroneRecall" )
 	entity cameraOwner = camera.GetOwner()
 	cameraOwner.EndSignal( "OnDestroy" )
@@ -3475,22 +3483,22 @@ bool function DroneHasMaxZ()
 }
 
 #if CLIENT
-void function MinimapPackage_PlayerDummy( entity ent, var rui )
-{
-	RuiSetImage( rui, "defaultIcon", $"rui/hud/minimap/compass_icon_player" )
-	RuiSetImage( rui, "clampedDefaultIcon", $"rui/hud/minimap/compass_icon_player_clamped" )
-	RuiSetBool( rui, "useTeamColor", false )
-	RuiSetFloat( rui, "iconBlend", 0.0 )
-	RuiSetBool( rui, "invertCameraViewFrac", false )
+	void function MinimapPackage_PlayerDummy( entity ent, var rui )
+	{
+		RuiSetImage( rui, "defaultIcon", $"rui/hud/minimap/compass_icon_player" )
+		RuiSetImage( rui, "clampedDefaultIcon", $"rui/hud/minimap/compass_icon_player_clamped" )
+		RuiSetBool( rui, "useTeamColor", false )
+		RuiSetFloat( rui, "iconBlend", 0.0 )
+		RuiSetBool( rui, "invertCameraViewFrac", false )
 
-	RuiTrackFloat( rui, "cameraViewFrac", ent, RUI_TRACK_STATUS_EFFECT_SEVERITY, eStatusEffect.camera_view )
-}
+		RuiTrackFloat( rui, "cameraViewFrac", ent, RUI_TRACK_STATUS_EFFECT_SEVERITY, eStatusEffect.camera_view )
+	}
 
-void function MinimapPackage_CryptoDrone( entity ent, var rui )
-{
-	RuiSetImage( rui, "defaultIcon", $"rui/hud/tactical_icons/tactical_crypto" )
-	RuiSetImage( rui, "clampedDefaultIcon", $"rui/hud/tactical_icons/tactical_crypto" )
-	RuiSetBool( rui, "useTeamColor", false )
-	RuiSetFloat( rui, "iconBlend", 0.0 )
-}
+	void function MinimapPackage_CryptoDrone( entity ent, var rui )
+	{
+		RuiSetImage( rui, "defaultIcon", $"rui/hud/tactical_icons/tactical_crypto" )
+		RuiSetImage( rui, "clampedDefaultIcon", $"rui/hud/tactical_icons/tactical_crypto" )
+		RuiSetBool( rui, "useTeamColor", false )
+		RuiSetFloat( rui, "iconBlend", 0.0 )
+	}
 #endif

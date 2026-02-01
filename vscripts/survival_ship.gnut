@@ -26,7 +26,9 @@ global function PlaneTest_threaded_simulated
 #endif
 
 const float MAX_DELTA = 5200.0
-struct {
+
+struct 
+{
 	float planeHeight = 0.0
 	float airburstHeight = 0.0
 
@@ -39,6 +41,9 @@ struct {
 	bool staticJumpPoint = false
 	array< void functionref(entity) > Callbacks_OnPlayerLaunchedFromPlane
 	array< void functionref(entity) > Callbacks_OnPlayerPutInPlane
+	
+	bool bGiveBasicSurvivalItems
+	
 } file
 
 void function SurvivalShip_Init()
@@ -46,6 +51,8 @@ void function SurvivalShip_Init()
 	RegisterSignal( "DevPlaneTest" )
 	RegisterSignal( "NoLongerJumpMaster" )
 	RegisterSignal( "ClearedPlayerPlaneViewMode" )
+	
+	file.bGiveBasicSurvivalItems = GetCurrentPlaylistVarBool( "give_basic_survival_items", true )
 
 	AddClientCommandCallback( "Sur_MakeEligibleForJumpMaster", ClientCommand_MakeEligibleForJumpMaster )
 	AddClientCommandCallback( "Sur_RelinquishJumpMaster", ClientCommand_RelinquishJumpMaster )
@@ -86,7 +93,9 @@ bool function ClientCommand_MakeEligibleForJumpMaster( entity player, array<stri
 
 void function SetPlayerPlaneViewMode( entity player )
 {
-	printt( "SetPlayerPlaneViewMode", player )
+	#if DEVELOPER
+		printt( "SetPlayerPlaneViewMode", player )
+	#endif
 
 	bool updateCamera = player.GetPlayerNetBool( "playerInPlane" ) == false
 
@@ -140,15 +149,21 @@ void function SetPlayerPlaneViewMode( entity player )
 
 void function TurnOffAimassistForPlaneView( entity player )
 {
-	thread function() : (player)
+	thread function() : ( player )
 	{
+		if( !IsValid( player ) )
+			return 
+			
 		player.SetAimAssistAllowed( false )
 
-		OnThreadEnd( function() : (player)
-		{
-			if ( IsValid( player ) )
-				player.SetAimAssistAllowed( true )
-		} )
+		OnThreadEnd
+		( 
+			function() : ( player )
+			{
+				if ( IsValid( player ) )
+					player.SetAimAssistAllowed( true )
+			} 
+		)
 
 		player.EndSignal( "ClearedPlayerPlaneViewMode" )
 		player.EndSignal( "OnDeath" )
@@ -325,7 +340,7 @@ void function SURVIVAL_SetMapDelta( float maxDelta )
 
 void function GiveBasicSurvivalItems( entity player )
 {
-	if( !IsValid( player ) || Playlist() == ePlaylists.fs_scenarios )
+	if( !IsValid( player ) || !file.bGiveBasicSurvivalItems )
 		return
 
 	//add white shield, white knockdown shield, white helmet, two syringes and two cells
@@ -342,7 +357,7 @@ void function GiveBasicSurvivalItems( entity player )
 	
 	Survival_SetInventoryEnabled( player, true )
 
-	ItemFlavor playerCharacter = LoadoutSlot_GetItemFlavor( ToEHI( player ), Loadout_CharacterClass() )
+	//ItemFlavor playerCharacter = LoadoutSlot_GetItemFlavor( ToEHI( player ), Loadout_CharacterClass() )
 	
 	// todo: find why it's not playing fx on cockpit
 	// BroadcastItemPickup( player, "armor_pickup_lv1", eLootAction.EQUIP )
@@ -683,7 +698,6 @@ void function JumpMasterDeathRelinquish( entity player )
 
 int function SortJumpmastersToTop(entity a, entity b)
 {
-
 	if ( ( !IsValid(a) || !a.GetPlayerNetBool("isJumpmaster") ) && ( IsValid( b ) && b.GetPlayerNetBool("isJumpmaster") ) )
 		return 1
 

@@ -12,7 +12,6 @@ playlists
 				///////////////////////////	SECTION 1: DEFAULTS	///////////////////////////////////
 				//////////////	FOR MOST USE CASES, NO NEED TO CHANGE ANY OF THESE	///////////////
 				///////////////////////////////////////////////////////////////////////////////////
-
 				flowstate_enable_weapons_locked_sets			1 //Enables predefined white, blue, purple weapons.
 				flowstate_disable_doublejump_jumppad			0 //Disables double jump in Octane's jumppad
 				
@@ -399,27 +398,66 @@ playlists
 				// usage: Comma Separated list of server admin uids
 				// example: "15423978654235,620652652562,72462626522253"
 				admins_list										"1009201166937, 1006682745209, 1008975626400, 1009054910095, 1010133297499, 1007974056417"
+				enable_admin_noclip								0 		// protected commmand, set to 1 to allow admins to do 'cc noclip'
+				reserve_admin_slot								0		// if enabled, reserves one player slot for only admins. If the server is 49/50 players and the connecting player is not admin, they are kicked.
 				
 				enable_motd 									1		// Enables message of the day for server (defined at bottom of file in SECTION 4:  MOTD_TEXT )
 				
-				// global auto mute system 
-				opt_in_global_mute								1 		// Globally muted players on tracker will auto mute.
+				enable_loose_playername_comparison				0		// Allows codepaths that look for a playername to match based on partials.  
+				// For example: If a player is named "BobTheBuilder", /chal bob would match for any player with bob in their name. Likewise:  cc ban bob, would match for bob.
 				
+				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// This section is for configuring the new auto rotator. This is comma separated, lists of:
+				// mapname playlist gamemode minplayers maxplayers.  Mapnames/playlists/gamemodes do not have to be complete, they will match partials.
+				//
+				// Example:  "aque 1v1 fs_dm 0 20"  --- will match for: "mp_rr_aqueduct fs_1v1 fs_dm 0 20".
+				// Each combination on the rotation list should be unique, as it will be used to determine the current map
+				//
+				// You can specify any map/playlist/gamemode combination separated by commas, gamemode is optional, but reccomended.
+				// minplayers (min players required to switch tot his map) is also optional, but reccomended, as some playlists may have player count restrictions. 
+				// If a map is due for rotation, but there are not enough players in the server for it, it will be skipped.
+				// If minplayers is not provided, a default value of 0 will be used
+				// maxplayers -- if the current server player count exceeds this, the rotation entry will be skipped.
+				//
+				// "comp 1v1 fs_dm, holiday winter winter 8, desert scenarios fs_dm, aque instagib fs_dm"
+				//
+				// If a combination is not valid, you will receive an assert error on startup with details about all of
+				// the incorrect combinations. 
+				//
+				// Leave blank to disable. NOTE: Do not repeat the same combination of  map playlist gamemode in the file, or rotation will be lost.
+				// Full documentation on R5Reloaded discord: https://discord.com/channels/873158454850756638/1459614674994594026
+				
+				auto_rotate_list								"" //"comp 1v1 fs_dm, holiday winter winter 9, desert scenarios fs_dm, aque instagib fs_dm"
+				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+				
+				cycle_halo_playlists							1 		// Set this to 1 to make halomodes multi-playlist //as of 1/31/2026 halo mode is still stripped from the game
+				
+				///////////////////////////////////////////////////////////////////////////////////
+				//// Chat Vars																///////
+				///////////////////////////////////////////////////////////////////////////////////
 				// every interval, a players msg count will be decreased by the threshold or set to 0 ( whichever is greater ).
 				// if the players msg count reaches threshold number they are auto muted for chat_timeout time or
-				// respective textmute_offence_tiers for that player's offence count based on decay time/amount
-				
+				// respective textmute_offence_tiers for that player's offence count based on decay time/amount	
 				opt_in_spam_mute								1		// Enables auto muting and unmuting with below settings.
 				chat_interval									12		// window time in seconds a threshhold for messages counts ( this decreases msg total by "chat_threshhold" amount for each "chat_interval" completion )
 				chat_threshhold									5 		// How many messages within this window 
-				chat_timeout									"" 		// string: time format of  "0 days 0 hours 2 mins 30 seconds" and any combination of, multiples of, or in any order. - mutes player for duration specified. Can leave blank if using offence tiers.
-				
+				chat_timeout									"" 		// string: time format of  "0 days 0 hours 2 mins 30 seconds" and any combination of, multiples of, or in any order. - mutes player for duration specified. Can leave blank if using offence tiers.			
 				textmute_offence_tiers							"10 secs, 20 secs, 30 secs" 		// comma separated list of time strings. example: "3 secs, 10 secs, 20 secs, 30 secs, 5 mins"	
 				textmute_offence_decay_time						45.0 	// Time that must pass before players offence tier is reduced by "textmute_offence_decay_amount".   -- 0 to disable
 				textmute_offence_decay_amount					1		// How many offence levels will be decreased for player each "textmute_offence_decay_time" cycle
+
 				
-				cycle_halo_playlists							1 		// Set this to 1 to make halomodes multi-playlist
-				
+				///////////////////////////////////////////////////////////////////////////////////
+				//// Player Timeout System	(Jail )											///////
+				///////////////////////////////////////////////////////////////////////////////////
+				timeout_enable									1		// Enables the timeout system for admins (soon: vote-timeout)
+				timeout_default_time							120		// Default timeout time if the admin does not specify time		
+				// timeout_message & timeout_expired_message
+				// Both of these are parsed and accept placeholders that are dynamically applied to the user who receives the message 
+				// Available: #player, #uid, #expires, #reason, #amount, #admin
+				timeout_message									"#player, you've been timedout by #admin.\nReason: #reason. \nExpires in: #expires"
+				timeout_expired_message							"#player, your timeout has expired."
+
 				///////////////////////////////////////////////////////////////////////////////////
 				//// Aim Assist																///////
 				///////////////////////////////////////////////////////////////////////////////////
@@ -467,6 +505,9 @@ playlists
 				restricted_kick_log 1
 				///////////////////////////////////////////////////////////////////////////////////
 				///////////////////////////////////////////////////////////////////////////////////
+				
+				// (mk): todo: This wont be live until next major update requiring server/clients to both update
+				//disable_message_sounds							0 // optionally disable default message banner sounds on client by setting to 1
 			}
 			maps
 			{
@@ -1376,7 +1417,7 @@ playlists
 		
 		fs_realistic_ttv
 		{
-						inherit defaults
+			inherit defaults
 			vars
 			{
 				visible											1
@@ -1409,6 +1450,8 @@ playlists
 				sur_circle_start_paused							1
 				
 				//Replays: 
+				use_r2_deathcam									1
+				deathcam_enabled								1
 				replay_enabled					 				1 		 
 				replay_delay					   				5
 				replay_new_ui 									1
@@ -1501,7 +1544,7 @@ playlists
 				flowstateExtrashieldValue 						150 //extrashield actual value
 				afk_to_rest_bool								0
 				
-				enable_bullet_slow					1
+				enable_bullet_slow								1
 				
 				flowstate_modified_movement						0 // 0 = Apex || 1 = Titanfall 2 || 2 = Titanfall 2 High Air Accel || 3 = Titanfall 2 Low Grav || 4 = CSGO || 5 = CSGO High Air Accel || 6 = Surf || 7 = Half-Life 1 || 8 = Halo || 9 = Superglide Boost || 10 = Instagib || 11 = Fun Mode || 12 = Halo Movement NEW		
 			
@@ -1509,14 +1552,21 @@ playlists
 				desertlands_script_train_enable					0
 				
 				show_short_champion_screen						1
+				
+				random_dummy_spawn								0 //bool, enables ai bots spawning randomly to kill someone
+				random_dummy_spawn_mintime						100
+				random_dummy_spawn_maxtime						250
+				allow_legend_select								0
+				realistic_mode_allow_legend_abilities			0 
+				
 			}
 			gamemodes { fs_dm { maps {
 				mp_rr_desertlands_64k_x_64k						1
 				mp_rr_desertlands_64k_x_64k_nx				 	1
 			} } }
 		}
-    
-    fs_4d
+		 
+		fs_4d
 		{
 			inherit defaults
 			vars
@@ -1933,6 +1983,172 @@ playlists
 				mp_rr_arena_composite 							1
 			} } }
 		}
+		
+		fs_grapples_n_guns
+		{
+			inherit defaults
+			vars
+			{
+				visible											1
+				
+				name							   				"Grapples N Guns"
+				description										"FSDM Game variant with infinite grapples, snipers, modified movement and sounds."
+				abbreviation					  				"GNG"
+				lobbytitle						 				"Grapples N Guns"
+			
+				image							  				worlds_edge
+				video							  				worlds_edge
+				panel_image										panel_worlds_edge
+				battlechatter_enabled			  				1
+				
+				// match teams will not fill with more than one party, up to max_teams of size max_team_size (or less) -- not exceeding max_players
+				max_team_size									1 // above 1 will enable tdm
+				max_players										25
+				min_players										0
+				
+				//Skip Intros:
+				character_select_time_min		  				0
+				character_select_time_max		  				0
+				charselect_picking_delay_after_all 				0
+				survival_enable_squad_intro						0
+				survival_enable_gladiator_intros   				0
+				jump_from_plane_enabled							0
+				match_ending_enabled			   				0
+				
+				//No circle:
+				sur_circle_start_paused							1
+								
+				
+				//Replays:
+				use_r2_deathcam									1
+				deathcam_enabled								1
+				replay_enabled					 				1 		 
+				replay_delay					   				5
+				replay_new_ui 									1
+				
+				
+				
+				//GENERAL SETTINGS
+				flowstate_allow_cfgs							0
+				flowstateBattleLogEnable 						0
+				flowstateChatLogEnable 							0
+				
+				default_shield_hp				  				50
+				survival_shields				   				1
+				skydive_ziplines_enabled		   				1
+				ground_loot_enable 				   				0
+				lootbin_loot_enable								0
+				
+				survival_jumpkit_enabled		   				0
+				survival_wallrun_enabled		   				0
+				
+				survival_infinite_ammo			 				1
+				survival_custom_deploy			 				1
+					
+				//For FFA classic mode
+				//specific weapons and abilities settings
+				respawn_kit_enabled 							1
+				respawn_kit_primary_weapon 						"mp_weapon_sentinel_grapples sniper_mag_l3"
+				respawn_kit_secondary_weapon 					""
+				respawn_kit_tactical 							"mp_ability_grapple_grapples"
+				respawn_kit_ultimate 							""
+				
+				//random weapons and abilities settings
+				flowstateRandomGuns 							0 	//round, big weapons list
+				flowstateRandomGunsMetagame						0 	//Metagame small weapon list primary:(r99,r301,flatline) secondary:(wingman,pk,eva,mastiff) every round
+				flowstateRandomTactical 						0 	//grapple,phase walk,stim,bubble, bang smokes, hound q, tf2 cloak
+				flowstateRandomUltimate							0 	//caustic ult,jumppad,wraith ult,3dash,hound ult, gibby ult
+
+				//whitelisted_weapon_0 							"mp_weapon_mastiff"
+				//whitelisted_weapon_1 							""				
+				
+				//whitelisted_ability_0 						"mp_weapon_grenade_bangalore"
+				//whitelisted_ability_1 						""
+				
+				flowstateEndlessFFAorTDM						0 //location won't change, no champion will be defined
+				Admins											""
+				respawn_delay 									5
+				flowstateRoundtime 								800
+				flowstateResetKills 							1
+				flowstateTimer 									1
+				flowstateLockPOI 								0  // flowstateRandomizePOIS must be 0 if you want to lock poi.
+				flowstateLockeedPOI 							0
+				locked_poi_name									""
+				flowstateCapitolCityReplacesTTVLocation 		0 //Makes ttv building bigger
+				flowstateAdminTgive 							0 //tgive is for the admin ONLY
+				flowstateAutoChangeLevelEnable					1
+				flowstateRoundsBeforeChangeLevel				3
+				flowstateGiveAllOpticsToPlayer					1
+				flowstate_headshots_only_gamemode 				0 //i recommend a wingman only in respawn kit above
+				flowstateReloadTacticalOnRespawn  				1
+				flowstateReloadUltimateOnRespawn 				1
+				
+				//custom maps by community
+				flowstate_Enable_Shipment_By_AyeZee				0
+				flowstate_Enable_Killhouse_By_AyeZee			0
+				flowstate_Enable_Nuketown_By_AyeZee				0
+				flowstate_Enable_Encore							0 //if disabled, it will try to load Rust first
+				flowstate_Enable_Killyard_By_DEAFPS				0
+				flowstate_Enable_Dustment_By_DEAFPS				0
+				flowstate_Enable_Shoothouse_By_DEAFPS			0
+				flowstate_Enable_Rust_By_DEAFPS					0
+				flowstate_Enable_NCanals_By_DEAFPS				0				
+				flowstate_Enable_Encore_Nuketown_By_AyeZee		0
+				
+				//disabled atm
+				flowstate_Enable_BRIGHWATER_By_Zero				0
+				flowstate_Enable_CAVE_By_BlessedSeal			0
+				flowstate_Enable_SKILLTRAINER_By_Colombia		0				
+				flowstate_Enable_CUSTOMMAP_By_Biscutz			0
+				flowstate_Enable_WHITEFOREST_By_Zero			0
+				
+				flowstateKickHighPingPlayer						0
+				flowstateMaxPingAllowed							300
+				solo_mode 										1 //this will fix the ingame player count text, so it wont display "??" in players alive (now players connected) count.
+				flowstateDoorsEnabled							0 //Doors enabled or disabled in all buildings.
+				flowstateDoorsRegen								0 //if door is damaged but not destroyed, it will regen health. Suggestion: false.
+
+				//visuals
+				flowstateForceCharacter 						1	//It enables the following settings
+				flowstateChosenCharacter 						8	// 0 Bang// 1 Bloodhound// 2 Caustic// 3 Gibby// 4 Lifeline// 5 Mirage// 6 Octane// 7 Pathy// 8 Wraith// 9 Watty// 10 Crypto
+				flowstateForceAdminCharacter					0
+				flowstateChosenAdminCharacter					0	// 0 Bang// 1 Bloodhound// 2 Caustic// 3 Gibby// 4 Lifeline// 5 Mirage// 6 Octane// 7 Pathy// 8 Wraith// 9 Watty// 10 Crypto
+				flowstateDummyOverride 							0	// explains itself, it's bugged with some abilities (grapple ie)
+				
+				//game continuity 
+				flowstateAutoreloadPrimary 						1
+				flowstateAutoreloadSecondary 					1
+				flowstateKillshotEnabled 						1	//enables the killshot sound when killing
+				
+				//extrashields
+				flowstateExtrashieldsEnabled 					0
+				flowstateExtrashieldsSpawntime 					240
+				flowstateExtrashieldValue 						150 //extrashield actual value
+				afk_to_rest_bool								0
+				
+				enable_bullet_slow								1
+				
+				flowstate_modified_movement						0 // 0 = Apex || 1 = Titanfall 2 || 2 = Titanfall 2 High Air Accel || 3 = Titanfall 2 Low Grav || 4 = CSGO || 5 = CSGO High Air Accel || 6 = Surf || 7 = Half-Life 1 || 8 = Halo || 9 = Superglide Boost || 10 = Instagib || 11 = Fun Mode || 12 = Halo Movement NEW		
+			
+				dodge_dash_enabled								0
+				
+				enable_headshot_sounds							0
+				enable_killshot_sounds							0
+			}
+			gamemodes { fs_dm { maps {
+				mp_rr_canyonlands_64k_x_64k						1
+				mp_rr_canyonlands_mu1						 	1
+				mp_rr_desertlands_64k_x_64k						1
+				mp_rr_desertlands_64k_x_64k_nx				 	1
+				mp_rr_desertlands_64k_x_64k_tt				 	1
+				mp_rr_party_crasher					  			1
+				mp_rr_canyonlands_mu1_night						1
+				mp_rr_canyonlands_staging					  	1
+				mp_rr_aqueduct									1
+				mp_rr_arena_composite 							1
+				mp_rr_arena_empty	 							1
+			} } }
+		}
 
 		fs_scenarios
 		{
@@ -1979,6 +2195,7 @@ playlists
 				ground_loot_enable 				   				0
 				lootbin_loot_enable								0
 				survival_infinite_ammo   		   				0 	//Disable if using groundloot / stack counts
+				give_basic_survival_items						0
 				
 				desertlands_script_train_stoppanel_enabled  	0 //Disable train button in scenarios
 				
@@ -2000,7 +2217,7 @@ playlists
 				flowstateAdminTgive 							0 //admin is for tgive only, 0 will enable dev menu weapons for players
 				flowstate1v1MatchLoadout						0
 				
-				activate_passive_abilities				1
+				activate_passive_abilities						1
 				
 				flowstate_disable_all_map_triggers				0
 
@@ -2153,7 +2370,7 @@ playlists
 				
 				
 				
-				default_shield_hp				  				100
+				default_shield_hp				  				125
 				survival_shields				   				1
 				skydive_ziplines_enabled		   				1
 				ground_loot_enable 				   				0
@@ -2230,7 +2447,9 @@ playlists
 				give_legend 									0 // allows giving legend ( during challenge only )
 				challenge_recap_server_message					1 //enables quick kill/death recap msg in chat (requires chat bot enabled in r5rdev_config.json)
 				custom_weapons_challenge_only					1 //restricts custom weapons to during challenge only ( dev menu/weapon menu )
-						
+					
+					
+					
 				rotate_map 										1 // rotatesmaps in enabled maps section. 
 						
 				disable_lag_comp								0 //not advised
@@ -2239,6 +2458,7 @@ playlists
 																	// or since last damage to rest during a fight 
 																	// if player tries to rest, it will send them to rest after fight 
 																	// and tell them they can try again in (n) seconds. 
+				
 				
 				
 				// extra
@@ -2254,6 +2474,10 @@ playlists
 				custom_match_ending_message						"切换地图中....."
 				give_weapon_stack_count_amount					3 // Gives extra ammo stacks for the random given weapon - DOES NOT WORK WITH: survival_infinite_ammo 1
 				player_collision_enabled						1 // 0 disables players colliding with each other.
+				player_rest_collision_enabled					0 // 0 disables players colliding with each other in rest. 
+				allow_legend_select								0 // Allow selecting legends with /legend menu.
+				player_max_fight_distance						2000 // How far can players get from centerpoint between spawnA and spawnB for a fight.
+				
 				
 				//The following is for when 
 				//installing or enabling extra spawn paks
@@ -2948,42 +3172,53 @@ playlists
 			inherit survival
 			vars
 			{
-				name                                           "Rank-up Parkour [Practice Map]"
-				visible                                        1
-				flowstate_mod_active						   1
+				name											"Rank-up Parkour [Practice Map]"
+				visible											1
+				flowstate_mod_active							1
 
 				// Skip intros:
-				waiting_for_players_spawning_enabled           1
-				waiting_for_players_countdown_seconds          0
-				waiting_for_players_timeout_seconds            1
-				character_select_time_max                      0.0
-				character_select_time_min                      0.0
-				survival_enable_gladiator_intros               0
-				jump_from_plane_enabled                        0
-				survival_shields							                 0
-				survival_infinite_ammo						             1
+				waiting_for_players_spawning_enabled			1
+				waiting_for_players_countdown_seconds			0
+				waiting_for_players_timeout_seconds				1
+				character_select_time_max						0.0
+				character_select_time_min						0.0
+				survival_enable_gladiator_intros				0
+				jump_from_plane_enabled							0
+				survival_shields								0
+				survival_infinite_ammo							1
 
 				// No circle:
-				sur_circle_start_paused                        1
+				sur_circle_start_paused							1
 
-				is_practice_map								                 1
+				is_practice_map									1
 				// Can change loadouts:
-				dev_loadout_changeable_at_any_time             1
-				sur_dev_unrestricted_character_changes         1
+				dev_loadout_changeable_at_any_time				1
+				sur_dev_unrestricted_character_changes			1
 
 				// Bots:
-				sur_bots_spawn_with_random_weapons             1
-				match_ending_enabled                           0
-				max_team_size								                   120
-				max_players                                    120
-				min_players                                    1
-				enable_nessies                                 0
+				sur_bots_spawn_with_random_weapons				1
+				match_ending_enabled							0
+				max_team_size									120
+				max_players										120
+				min_players										1
+				enable_nessies									0
 
+				//disable changing legend with client command 
+				enable_loadouts_set								0
+				
+				//can player ping 
+				player_can_ping									0
+				
+				//no team unit frames
+				teammate_huds_enabled							0
+				
+				//no crypto drone scanning
+				disable_crypto_scan								1
 			}
 			gamemodes { survival { maps {
-				mp_rr_desertlands_64k_x_64k                    	1
-				mp_rr_desertlands_64k_x_64k_nx                 	1
-				mp_rr_desertlands_64k_x_64k_tt                 	1
+				mp_rr_desertlands_64k_x_64k						1
+				mp_rr_desertlands_64k_x_64k_nx					1
+				mp_rr_desertlands_64k_x_64k_tt					1
 				
 			} } }
 		}
@@ -3423,7 +3658,6 @@ playlists
 				enable_bullet_slow					1
 				
 				activate_passive_abilities				1
-				enable_motd										0
 				flowstate_mod_active							0
 				enable_global_chat								0
 			}
@@ -3483,7 +3717,6 @@ playlists
 				enable_bullet_slow					1
 				
 				activate_passive_abilities				1
-				enable_motd										0
 				flowstate_mod_active							0
 				enable_global_chat								0
 			}
@@ -3546,7 +3779,6 @@ playlists
 				enable_bullet_slow					1
 				
 				activate_passive_abilities				1
-				enable_motd										0
 				flowstate_mod_active							0
 				enable_global_chat								0
 
@@ -3633,7 +3865,6 @@ playlists
 				charge_pylons_raise_time_override               15
 
 				enable_bullet_slow					1
-				enable_motd										0
 				flowstate_mod_active							0
 			}
 			gamemodes { survival { maps {
@@ -3705,7 +3936,6 @@ playlists
 
 				survival_training 							1
 				flowstate_mod_active						0
-				enable_motd									0
 			}
 			gamemodes { survival { maps {
 				mp_rr_canyonlands_staging				   	1
@@ -3754,9 +3984,7 @@ playlists
 				dodge_dash_enabled								0
 
 				custom_loot               						0
-				enable_motd										0
-				flowstate_mod_active							0
-				
+				flowstate_mod_active							0			
 			}
 			gamemodes { survival { maps {
 				mp_rr_desertlands_64k_x_64k						1

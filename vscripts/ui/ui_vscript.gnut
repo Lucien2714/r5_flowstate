@@ -518,8 +518,9 @@ void function Load_Level_based_UIGlobals()
 void function UICallback_AdminStatus( bool status )
 {
 	#if DEVELOPER
-	printw( "UICallback_AdminStatus", status )
+		printw( "UICallback_AdminStatus", status )
 	#endif
+	
 	uiGlobal.bIsServerAdmin = status
 }
 

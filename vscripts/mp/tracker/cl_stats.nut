@@ -91,7 +91,7 @@ void function Tracker_SetPlayerStatFloat( entity player, float value )
 void function ClientStats_Think()
 {
 	FlagWait( "EntitiesDidLoad" )
-	if( !GetServerVar("tracker_enabled") )
+	if( !GetServerVar( "tracker_enabled" ) )
 	{
 		#if DEVELOPER 
 			printl( "Connected server is not running tracker. ending ClientStats_Think()" )
@@ -173,7 +173,7 @@ var function Tracker_FetchStat( entity player, string stat )
 		
 		Tracker_PreloadStat( player, stat )
 	}
-	else 
+	else
 	{
 		return file.playerStatTables[ player ][ stat ]
 	}

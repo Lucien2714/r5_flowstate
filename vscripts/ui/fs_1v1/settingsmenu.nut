@@ -61,7 +61,13 @@ void function FS_1v1_SettingsMenu_Open( )
 
 void function FS_1v1_SettingsMenu_Close( )
 {
-	CloseAllMenus()
+	var ignoreCloseMenu = GetMenu( "SERVER_MOTD" )
+	
+	if( !ignoreCloseMenu )
+		CloseAllMenus()
+	else
+		CloseAllMenusExcept( [ ignoreCloseMenu ] )
+		
 	EmitUISound( "UI_Menu_FriendInspect" )
 }
 
@@ -105,8 +111,8 @@ void function OnR5RSB_CloseSendUpdate() // (mk): This is where everything spammy
 		ClientCommand( "CC_1v1_IBMM 1" )
 	}
 
-	ClientCommand( "CC_1v1_MaxEnemyLatency " + GetConVarInt( "fs_1v1_maxenemylatency" ).tostring() )
-	ClientCommand( "CC_1v1_MaxIBMMTime " + GetConVarInt( "fs_1v1_maxibmmtime" ).tostring() )
+	ClientCommand( "CC_1v1_MaxEnemyLatency " + GetConVarString( "fs_1v1_maxenemylatency" ) )
+	ClientCommand( "CC_1v1_MaxIBMMTime " + GetConVarString( "fs_1v1_maxibmmtime" ) )
 
 	GoBackButtonFunct(null)
 }
@@ -129,18 +135,18 @@ void function WeaponsMenuButton(var button)
 
 void function StartInRestButtonChange(var button)
 {
-	ClientCommand( "CC_1v1_StartInRest " + GetConVarInt("fs_1v1_startinrest").tostring())
+	ClientCommand( "CC_1v1_StartInRest " + GetConVarString( "fs_1v1_startinrest" ) )
 }
 
 void function IBMMButtonChange(var button)
 {
-	ClientCommand( "CC_1v1_IBMM " + GetConVarInt("fs_1v1_ibmm").tostring() )
+	ClientCommand( "CC_1v1_IBMM " + GetConVarString( "fs_1v1_ibmm" ) )
 	
-	if( GetConVarInt("fs_1v1_ibmm").tostring() == "0" )
+	if( GetConVarInt( "fs_1v1_ibmm") == 0 )
 	{
 		SetConVarInt( "fs_1v1_maxibmmtime", 0 )
 	}
-	else if( GetConVarInt("fs_1v1_ibmm").tostring() == "1" )
+	else if( GetConVarInt("fs_1v1_ibmm") == 1 )
 	{
 		SetConVarInt( "fs_1v1_maxibmmtime", 3 )
 	}	
@@ -148,34 +154,34 @@ void function IBMMButtonChange(var button)
 
 void function AcceptChallengesButtonChange(var button)
 {
-	ClientCommand( "CC_1v1_AcceptChallenges " + GetConVarInt("fs_1v1_acceptchallenges").tostring())
+	ClientCommand( "CC_1v1_AcceptChallenges " + GetConVarString("fs_1v1_acceptchallenges") )
 }
 
 void function ShowInputBannerButtonChange(var button)
 {
-	ClientCommand( "CC_1v1_ShowInputBanner " + GetConVarInt("fs_1v1_showinputbanner").tostring())
+	ClientCommand( "CC_1v1_ShowInputBanner " + GetConVarString( "fs_1v1_showinputbanner" ) )
 }
 
 void function ShowVsUIButtonChange(var button)
 {
-	ClientCommand( "CC_1v1_ShowVsUI " + GetConVarInt("fs_1v1_showvsui").tostring())
+	ClientCommand( "CC_1v1_ShowVsUI " + GetConVarString("fs_1v1_showvsui") )
 	
-	RunClientScript( "SetShow1v1Scoreboard", GetConVarInt("fs_1v1_showvsui").tostring() )
+	RunClientScript( "SetShow1v1Scoreboard", GetConVarString("fs_1v1_showvsui") )
 }
 
 void function CamoColorButtonChange(var button)
 {
-	ClientCommand( "CC_1v1_CamoColor " + GetConVarInt("fs_1v1_camo").tostring())
+	ClientCommand( "CC_1v1_CamoColor " + GetConVarString("fs_1v1_camo") )
 }
 
 void function HeirloomButtonChange(var button)
 {
-	ClientCommand( "CC_1v1_Heirloom " + GetConVarInt("fs_1v1_heirloom").tostring())
+	ClientCommand( "CC_1v1_Heirloom " + GetConVarString("fs_1v1_heirloom") )
 }
 
 void function CharmButtonChange(var button)
 {
-	ClientCommand( "CC_1v1_Charm " + GetConVarInt("fs_1v1_charm").tostring())
+	ClientCommand( "CC_1v1_Charm " + GetConVarString("fs_1v1_charm") )
 }
 
 void function MaxEnemyLatencyButtonChange(var button)

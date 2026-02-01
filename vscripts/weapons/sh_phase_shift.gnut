@@ -213,7 +213,7 @@ int function PhaseShift( entity ent, float warmupTime, float duration, int shift
 			thread ServerPhaseShiftPlayerThread( ent, warmupTime, duration, shiftStyle )
 		#else
 			thread ClientPhaseShiftWarmupThread( ent, warmupTime )
-		#endif // #if SERVER
+		#endif
 
 		return 1
 	}
@@ -270,7 +270,7 @@ void function ServerPhaseShiftPlayerThread( entity ent, float warmupTime, float 
 		function() : ( ent, oldNoTarget, shiftStyle )
 		{
 			if ( IsValid( ent ) )
-			{
+			{		
 				ent.Signal( "StopPhaseShift" )
 				ent.Solid()
 				ent.SetNoTarget( oldNoTarget )

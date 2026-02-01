@@ -56,8 +56,12 @@ void function OnWeaponActivate_ability_phase_walk( entity weapon )
 bool function OnWeaponAttemptOffhandSwitch_ability_phase_walk( entity weapon )
 {
 	entity player = weapon.GetWeaponOwner()
-	if ( IsValid( player ) && player.IsPhaseShifted() )
+	if ( IsValid( player ) && player.IsPhaseShiftedOrPending() )//player.IsPhaseShifted() )
+	{
+		CancelPhaseShift( player )
+		OnWeaponChargeEnd_ability_phase_walk( weapon )
 		return false
+	}
 
 	return true
 }
@@ -114,9 +118,7 @@ void function PhaseWalk_Thread( entity player, float chargeTime )
 			if ( IsValid( player ) )
 			{
 				TrackingVision_CreatePOI( eTrackingVisionNetworkedPOITypes.PLAYER_ABILITIES_PHASE_DASH_STOP, player, player.GetOrigin(), player.GetTeam(), player )
-				ForceAutoSprintOff( player )
-
-          
+				ForceAutoSprintOff( player )    
 			}
 			if ( player in file.hasLockedWeaponsAndMelee && file.hasLockedWeaponsAndMelee[player]  )
 			{
@@ -124,6 +126,7 @@ void function PhaseWalk_Thread( entity player, float chargeTime )
 				{
 					UnlockWeaponsAndMelee( player )
 				}
+				
 				file.hasLockedWeaponsAndMelee[player] <- false
 			}
 			if ( IsValid( dashFX ) )

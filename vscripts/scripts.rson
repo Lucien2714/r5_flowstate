@@ -1248,6 +1248,8 @@ Scripts:
 	custom_maps/_custom_strafeitmap.nut
 	
 	mp/_movement_recorder_deprecated.nut
+	
+	gamemodes/fs_grapples_n_guns/_fs_grapples_n_guns.nut
 ]
 
 When: "CLIENT"

@@ -48,6 +48,7 @@ const int 	MAX_SAY_MSG 						= 255
 // ╚══════╝
 // SHARED GLOBAL //TODO: Reduce repeat declares between tracker/non tracker
 global function g__InternalCheckReload //todo: move somewhere ideal
+global function IsClientCommandAdminEnabled
 
 global function SavePlayerData
 global function Tracker_FetchPlayerData
@@ -231,7 +232,7 @@ global function GetTrackerErrorArray
 
 const int 	MAX_SECONDS_WAIT_FOR_BATCH_LOAD 	= 5
 const float MAX_FIGHT_HISTORY_TIME 				= 20
-const float MAX_WAIT_FOR_LOGGING_THREAD 		= 10 //5 seconds
+const float MAX_WAIT_FOR_LOGGING_THREAD 		= 10 //10 = 5 seconds
 const float DAMAGE_LOOKBACK_TIME_WINDOW 		= 20.0
 const int 	RESTRICTED_ACCESS_STATUS_REQUIRED 	= 7 // refer to CheckIfPlayerHasAccess()
 const int 	REQUIRED_SYNC_DATA_FIELDS 			= 1  //amount of fields returned by stats the scripts require (non-settings values)
@@ -338,7 +339,7 @@ struct PlayerMetrics
 	int previous_score = 0
 	
 	bool isValid
-};
+}
 
 //tables
 table< string, bool > PlayerDidJump
@@ -351,7 +352,7 @@ array< PlayerMetrics > PlayerMetricsArray
 array< PlayerVerifyCount > playerVerifyCounts
 
 #if SERVER
-	bool function Enable_CC_Administration() 		{ return GetCurrentPlaylistVarBool("cc_administration", false) }
+	bool function Enable_CC_Administration() 		{ return GetCurrentPlaylistVarBool( "cc_administration", false ) }
 	bool function Logging_ShipStats() 				{ return TrackerGetSettingBool( "server.TRACKER_SHIPSTATS" ) }
 	bool function Ea_Verify_Server()				{ return TrackerGetSettingBool( "server.EA_VERIFY_SERVER" ) && GetConVarInt( "sv_onlineAuthEnable" ) == 1 }
 #endif
@@ -360,7 +361,7 @@ struct PlayerData
 {
 	string playerUID 
 	string playerName 
-};
+}
 
 enum eLogState 
 { 
@@ -390,28 +391,28 @@ struct //Todo: move appropriate to tracker.var
 	array<string> statsLocalAllowed
 	
 	array<string> requestedStatsArray
-	bool _registerAllSettings = false
+	bool _registerAllSettings
 	float maxWaitForBatchLoad
 	
-	int fightIdCounter = 0
-	bool PIN_GameState_Start = false
+	int fightIdCounter
+	bool PIN_GameState_Start
 	bool global_stats
 
-	bool bTrackerEnabled = false
+	bool bTrackerEnabled
 	bool bTrackerEncryption = true
-	bool scriptLogthreadRunning = false
+	bool scriptLogthreadRunning
 	bool restricted_server
 	bool bSyncedGlobal
 	bool bSafeLog = true
-	bool bShouldShip = false
+	bool bShouldShip
 	bool bCheckShip
 	bool update_discord_player_counts
 	bool gamemode_type_1v1 // tell stat calculations only one attacker
 	bool afk_to_rest_enabled = true // bool to reflect state of cc (chat command) cc afk 1/0
-	bool superglideDetect = false
-	bool bBatchFetchInit = false
-	bool bForceUpdatePlayerData = false
-	bool bStatsShipped = false 
+	bool superglideDetect
+	bool bBatchFetchInit
+	bool bForceUpdatePlayerData
+	bool bStatsShipped
 	bool stats_discord_webhook_matches_enabled
 	bool bClientCommandAdminEnabled
 	
@@ -438,11 +439,11 @@ struct //Todo: move appropriate to tracker.var
 	
 	//restricted settings ( configure in r5rdev_config.json file )
 	array< string > whitelist
-	int restricted_gamesplayed = 0
-	int restricted_kills = 0
-	int restricted_playtime = 0
-	int restricted_rank = 0
-	float restricted_kd = 0.0
+	int restricted_gamesplayed
+	int restricted_kills
+	int restricted_playtime
+	int restricted_rank
+	float restricted_kd
 	string restricted_join_message = "You are able to play on this restricted server."
 	string restricted_whitelist_message = "You are whitelisted to play on this restricted server."
 	string restricted_admin_message = "You are an admin."
@@ -1145,14 +1146,12 @@ void function INIT_BatchPersistenceDataFetch()
 	
 	foreach ( player in GetPlayerArray() )
 	{
-		bool next_player = false
-		
         while ( IsDisconnected( player ) ) 
 		{
 			WaitFrame()
 			
 			#if DEVELOPER
-				print("waiting for connection")
+				print( "waiting for connection" )
 			#endif
         }
 
@@ -1404,7 +1403,7 @@ void function AddCallback_PlayerData( string setting, void functionref( entity p
 	if( setting in file.PlayerSettingsMap )
 	{
 		if( file.PlayerSettingsMap[ setting ].contains( callbackFunc ) )
-			mAssert( false, format( "Already added function %s() for setting: %s ", string( callbackFunc ), setting ) )
+			mAssert( false, "Already added function %s() for setting: %s ", string( callbackFunc ), setting )
 		else
 			file.PlayerSettingsMap[ setting ].append( callbackFunc )
 	}
@@ -1498,13 +1497,14 @@ void function __CONTROLLED_LogInit()
 }
 
 void function PIN_Init()
-{
-	TrackerUtilityInit()			
+{		
 	file.launchStartUnixTime = GetUnixTimestamp()
 	
 	#if !SERVER
 		return
 	#endif 
+	
+	TrackerUtilityInit()
 	
 	if( IsLobby() )
 		return
@@ -1543,6 +1543,7 @@ void function PIN_Init()
 	if( file.bTrackerEnabled )
 	{
 		SetServerVar( "tracker_enabled", true )
+		SetUIVar( level, "tracker_enabled", true )
 		FlagInit( "START_LOG", true )
 		
 		AddCallback_OnTdmStateEnter_InProgress( Tracker_SetStartLog )
@@ -1557,7 +1558,10 @@ void function PIN_Init()
 	AddClientCommandCallback( "show", ClientCommand_mkos_return_data )
 	
 	if ( IsClientCommandAdminEnabled() )
-		AddClientCommandCallback( "cc", ClientCommand_mkos_admin ) 
+	{
+		AddCallback_OnClientConnected( CheckAdmin_OnConnect )
+		AddClientCommandCallback( "cc", ClientCommand_mkos_admin )
+	}
 	
 	if ( file.bTrackerEnabled )
 	{
@@ -1677,7 +1681,7 @@ void function Tracker_SettingsInit()
 
 	//max wait for players to connect before querying batch player stats
 	float trackerMaxWait 					= TrackerGetSettingFloat( "server.TRACKER_MAX_WAIT" )
-	file.maxWaitForBatchLoad				= trackerMaxWait != 0.0 ? trackerMaxWait : 7.0
+	file.maxWaitForBatchLoad				= trackerMaxWait > 0.0 ? trackerMaxWait : 7.0
 }
 
 //initplayer
@@ -1715,10 +1719,6 @@ void function PlayerConnectedCallback( entity player )
 	pdata.playerUID = playerUID
 	
 	file.HandleToPlayerData[ playerHandle ] <- pdata
-	
-	string checkName = pdata.playerName.slice( 0, 1 )
-	if( checkName == "[" ) //hack, make sure player is not message bot entity (TODO: REMOVE)
-		return
 		
     thread PIN_AddPlayer( player )
 	
@@ -2180,7 +2180,7 @@ void function BroadcastIntervalMessagesInit()
 		int interval = ( iRound10 / 10 ).tointeger()
 		file.iBotMessagesLoopTime = interval //seconds rounded to thread cycle as multiple of 10
 	}
-	else 
+	else
 	{
 		if( !empty( loopTime ) )
 			sqerror( "[TRACKER] Invalid LOOP_MESSAGES_INTERVAL ; setting to 60" )
@@ -2212,6 +2212,8 @@ void function BroadcastIntervalMessagesInit()
 			#endif
 		}
 	}
+	
+	thread MessageIntervalThread()
 }
 
 void function __executeEventStart_messages()
@@ -2268,12 +2270,6 @@ void function DEV_StartIntervalThread()
 
 void function MessageIntervalThread()
 {
-	if( file.bIntervalThreadRunning )
-	{
-		sqerror( "Interval thread is already running." )
-		return
-	}
-	
 	int threadCycleCount = 0
 	int loopMsgCount = 1 //gets reset when last message in loop messages is reached
 	
@@ -2295,16 +2291,16 @@ void function MessageIntervalThread()
 		}
 	)
 	
-	while( true )
-	{		
-		wait 10	
+	for( ; ; )
+	{
+		wait 10
 		
 		threadCycleCount += 1
 		
 		//events
 		foreach( interval, msgs in file.MessageEvents ) 
 		{
-			if ( ( threadCycleCount % interval) == 0 ) 
+			if ( ( threadCycleCount % interval ) == 0 ) 
 			{
 				foreach( index, _msg in msgs ) 
 					SendServerMessage( _msg )
@@ -2312,7 +2308,7 @@ void function MessageIntervalThread()
 		}	
 		
 		//train (loopmessages)
-		if( bLoopServerMessages )
+		if( bLoopServerMessages && threadCycleCount > 0 )
 			loopMsgCount = SendLoopMessage( threadCycleCount, loopMsgCount )
 	}
 	
@@ -2351,11 +2347,6 @@ bool function bBotEnabled()
 float function Tracker_GetMaxWaitForBatchLoad()
 {
 	return file.maxWaitForBatchLoad
-}
-
-bool function IsClientCommandAdminEnabled()
-{
-	return file.bClientCommandAdminEnabled
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -2508,7 +2499,7 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 		}
 		
 		string victimUID = victimIsPlayer ? victim.p.UID : string( victim.GetEncodedEHandle() )
-		victimUID = statPrintUID( victimUID )
+		victimUID = StatPrintUID( victimUID )
 		
 		string attackerUID
 		string attackerName
@@ -2535,7 +2526,7 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 			
 		int victim_handle = victim.GetEncodedEHandle()
 		int attacker_handle = attacker.IsPlayer() ? attacker.p.handle : damageSourceID
-
+		
 		if( attacker_handle == eDamageSourceId.bleedout )
 		{
 			#if DEVELOPER
@@ -2669,23 +2660,23 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 		{
 			if ( file.gamemode_type_1v1 || ( deathtime - event.actionTimestamp <= timeWindow ) ) 
 			{			
-				attackerUID = statPrintUID( GetPlayerUIDFromHandle( event.attackerHandle ) )
+				attackerUID = StatPrintUID( GetPlayerUIDFromHandle( event.attackerHandle ) )
 				attackerName = GetPlayerNameFromHandle( event.attackerHandle )
 				
-				totalDamageToVictim += event.damage;
+				totalDamageToVictim += event.damage
 				
-				string mul = event.hitCount > 1 ? "s" : ""; //this needs to go
+				string mul = event.hitCount > 1 ? "s" : "" //this needs to go
 				
 				//statement header
-				logString += "{" + attackerUID + "}{" + attackerName + "} dealt:";
+				logString += "{" + attackerUID + "}{" + attackerName + "} dealt:"
 
-				if (IsSpecialWeapon(event.weaponSource)) 
+				if ( IsSpecialWeapon( event.weaponSource ) ) 
 				{
-					int bulletsPerShot = GetBulletsPerShot(event.weaponSource);
-					int totalBulletsFired = event.hitCount * bulletsPerShot;
+					int bulletsPerShot = GetBulletsPerShot( event.weaponSource )
+					int totalBulletsFired = event.hitCount * bulletsPerShot
 					logString += format("Entry: {%.2f} damage ON {%s}{%s} at time {%.2f} in {%d} hit%s {%d/%d} bullets with weapon {%s} headshots: {%d};",
 										event.damage, victimUID, victimName, event.actionTimestamp, event.hitCount, mul, event.bulletsHit, totalBulletsFired, DamageSourceIDToString( event.weaponSource ), event.headshots )
-				} 
+				}
 				else 
 				{
 					logString += format("Entry: {%.2f} damage ON {%s}{%s} at time {%.2f} in {%d} hit%s with weapon {%s} headshots: {%d};",
@@ -2724,7 +2715,7 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 		{
 			foreach ( int eventIndex, DamageEvent event in allDamageEvents ) 
 			{			
-				attackerName = GetPlayerNameFromHandle(event.attackerHandle)
+				attackerName = GetPlayerNameFromHandle( event.attackerHandle )
 				
 				if ( event.victimHandle == victim_handle && ( deathtime - event.actionTimestamp <= timeWindow ) ) 
 				{
@@ -2734,7 +2725,7 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 
 						string mul = event.hitCount > 1 ? "s" : ""; //go away
 
-						logString += "{" + GetPlayerUIDFromHandle(event.attackerHandle) + "}{" + attackerName + "} dealt:";
+						logString += "{" + GetPlayerUIDFromHandle( event.attackerHandle ) + "}{" + attackerName + "} dealt:";
 
 						if ( IsSpecialWeapon( event.weaponSource ) ) 
 						{
@@ -2855,7 +2846,7 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 			}
 		
 			logString += format( "{%s}{%s} dealt:Recap: {%.2f} total damage in {%d} hits with weapon(s), headshots: {%d}, Total Jumps: {%d}, Total Shots: {%d}, Superglides: {%d};",
-								statPrintUID( GetPlayerUIDFromHandle( player_handles[i] ) ), playerDISPLAYNAME[i], playerTotalDamages[i], playerTotalHits[i], playerTotalHeadshots[i], attackerJumps, attackerShots, attackerSuperglides )
+								StatPrintUID( GetPlayerUIDFromHandle( player_handles[i] ) ), playerDISPLAYNAME[i], playerTotalDamages[i], playerTotalHits[i], playerTotalHeadshots[i], attackerJumps, attackerShots, attackerSuperglides )
 								
 			//DEBUG
 			//sqprint(format("Total shots for fight: %d", attackerShots));
@@ -2866,31 +2857,12 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 			
 			entity currentAttacker = GetEntityFromEncodedEHandle( player_handles[i] )
 			
-			//*move to gametype specific in future
-			// if ( Flowstate_IsLGDuels() )
-			// {			
-				// if ( IsValid( currentAttacker ) && IsValid( victim ) )
-				// {
-					// RecapStats( currentAttacker, playerTotalDamages[i], float( playerTotalHits[i] ), float( playerTotalShots[i] ), string( victimName ), victimTotalDamage, float( victimTotalHits ), float( victimTotalShots )  )
-				// }
-			// }
-			
-			if( file.gamemode_type_1v1 )
+			if( file.gamemode_type_1v1 && IsValid( currentAttacker ) )
 			{
-				//entity currentAttacker = GetEntityFromEncodedEHandle( player_handles[i] )
-				
-				if( IsValid( currentAttacker ) )
-				{
-					soloGroupStruct group = Gamemode1v1_GetPlayerSoloGroup( currentAttacker )
-				
-					if ( IsValid( group ) )
-					{
-						if( group.IsKeep )
-						{
-							addStatsToGroup( currentAttacker, group, playerTotalDamages[i], playerTotalHits[i], playerTotalShots[i], true )
-						}
-					}
-				}
+				soloGroupStruct group = Gamemode1v1_GetPlayerSoloGroup( currentAttacker )
+			
+				if ( IsValid( group.isValid ) && group.IsKeep )
+					addStatsToGroup( currentAttacker, group, playerTotalDamages[i], playerTotalHits[i], playerTotalShots[i], true )
 			}						
 		}
 		
@@ -3008,7 +2980,7 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 			else 
 			{
 				int attackerID = damageSourceID
-				
+			
 				attackerPlayerID = GetWorldSpawnRef( attackerID )
 				
 				if( !ShouldExcludeDamageSourceShipping( attackerID ) )
@@ -3273,7 +3245,7 @@ void function Tracker_HandleDamage( DamageEvent event, entity attacker, int weap
 	//sqprint( format( "Tracker: Handling damage for an event with isNew: %s and existing damage: %.2f\n", event.isNew ? "true" : "false", event.damage ) )
 }
 
-const array<int> trackedEventDamageSource = 
+const array<int> TRACKED_EVENT_DAMAGESOURCES = 
 [
 	eDamageSourceId.deathField,
 	eDamageSourceId.fall
@@ -3403,18 +3375,14 @@ void function Tracker_OnPlayerDamaged( entity victim, var damageInfo )
 		
 		attacker = InflictorOwner( DamageInfo_GetInflictor( damageInfo ) )		
 		
-		if( !attacker.IsPlayer() && attacker.GetClassName() == "trigger_hurt" )
-		{
-			#if DEVELOPER && DEBUGDMG
-				Warning( "Setting to worldspawn" )
-			#endif
-			
-			attacker = GetEnt( "worldspawn" )
-		}
-		else if( trackedEventDamageSource.contains( weaponSource ) ) 
+		if( !attacker.IsPlayer() && attacker.GetClassName() == "trigger_hurt" || TRACKED_EVENT_DAMAGESOURCES.contains( weaponSource ) )
 		{
 			attacker = GetEnt( "worldspawn" )
 			attackerHandle = weaponSource
+			
+			#if DEVELOPER && DEBUGDMG
+				Warning( "Setting attackerHandle weapon source as:" + attackerHandle )
+			#endif
 		}
 		else
 		{		
@@ -4879,18 +4847,6 @@ void function PIN_AddPlayer( entity player )
 	}	
 }
 
-void function BotInvis( entity bot )
-{	
-	if( !IsValid( bot ) )
-		return
-	
-	bot.NotSolid()
-	bot.Hide()
-	SetTeam( bot, 119 )
-	
-	bot.SetPlayerNetBool( "stats_loaded", true )
-}
-
 void function PIN_PlayerLeft( entity player, string reason )
 {
 	string playerName = player.GetPlayerName()
@@ -4926,11 +4882,6 @@ void function PIN_PlayerLeft( entity player, string reason )
 	}
 }
 
-void function CheckForMessageBot( entity player ) //todo: remove after native solution
-{
-	BotInvis( player )
-}
-
 void function PIN_PlayerSpawned( entity player )
 {
 	/*
@@ -4963,7 +4914,7 @@ void function PIN_PlayerRevived( entity injured, entity healer )
 void function PIN_PlayerKilled( entity victim, entity attacker, var damageInfo )
 {	
 	if ( file.bTrackerEnabled && TrackerIsLogging__internal() && IsValid( victim ) && victim.IsPlayer() )
-		thread __EndFight( victim, attacker, damageInfo, Time(), VectorToString( attacker.GetOrigin() ), VectorToString( victim.GetOrigin() ) )
+		thread __EndFight( victim, attacker, damageInfo, Time(), StatPrintVector( attacker.GetOrigin() ), StatPrintVector( victim.GetOrigin() ) )
 }
 
 void function Tracker_EndFight( entity victim, entity attacker, var damageInfo )
@@ -4971,7 +4922,7 @@ void function Tracker_EndFight( entity victim, entity attacker, var damageInfo )
 	if( !Flowstate_IsTrackerSupportedMode() || !file.bTrackerEnabled || !TrackerIsLogging__internal() )
 		return
 		
-	thread __EndFight( victim, attacker, damageInfo, Time(), VectorToString( attacker.GetOrigin() ), VectorToString( victim.GetOrigin() ) )
+	thread __EndFight( victim, attacker, damageInfo, Time(), StatPrintVector( attacker.GetOrigin() ), StatPrintVector( victim.GetOrigin() ) )
 }
 
 void function PIN_PlanePath( vector startPos, vector endPos, float duration )
@@ -5239,13 +5190,19 @@ int function Tracker_GetStartUnixTime()
 	return file.launchStartUnixTime 
 }
 
-string function statPrintUID( string uid )
+string function StatPrintUID( string uid )
 {
 	if( UIDisWorldSpawn( int( uid ) ) )
 		return _GetHardcodedWorldspawnRef( int( uid ) )
 
 	return uid
 }
+
+string function StatPrintVector( vector inData )
+{
+	return format( "%.5f|%.5f|%.5f", inData.x, inData.y, inData.z )
+}
+
 #endif //END TRACKER DEFINE
 
 
@@ -5429,6 +5386,12 @@ bool function SendServerMessage( string _msg, bool bIsAdmin = false )
 	return status
 }
 
+bool function IsClientCommandAdminEnabled()
+{
+	return file.bClientCommandAdminEnabled
+}
+
+
 #if HAS_TRACKER_DLL
 //do nothing
 #else
@@ -5475,6 +5438,7 @@ struct
 	bool afk_to_rest_enabled = false
 	int launchStartUnixTime
 	string msgBotPrefix = "SERVER"
+	bool bClientCommandAdminEnabled
 	
 } file
 
@@ -5528,6 +5492,7 @@ void function PIN_Init()
 			return
 		}
 		
+		file.bClientCommandAdminEnabled = true
 		__PlayerAdminsInit()
 		AddClientCommandCallback( "cc", ClientCommand_mkos_admin ) 
 		AddCallback_OnClientConnected( CheckAdmin_OnConnect )

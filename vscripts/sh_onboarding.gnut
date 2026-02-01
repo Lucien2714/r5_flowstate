@@ -120,6 +120,7 @@ struct
 	
 	#if SERVER
 		bool use_r2_deathcam
+		bool bReserveAdminSlot
 	#endif
 } file
 
@@ -151,6 +152,8 @@ void function SV_CL_Onboarding_Init()
 		
 		if( Gamemode() == eGamemodes.SURVIVAL )
 			AddCallback_GameStateEnter( eGameState.Postmatch, void function() : (){ SetAutoReloadState( true ) } ) //(mk): check for native reload
+	
+		file.bReserveAdminSlot = GetCurrentPlaylistVarBool( "reserve_admin_slot", false )
 	#endif
 }
 
@@ -941,7 +944,7 @@ void function OnPlayerKilled( entity victim, entity attacker, var damageInfo )
 	
 	victim.SetPredictionEnabled( false )
 	
-	if( Gamemode() == eGamemodes.fs_spieslegends || Gamemode() == eGamemodes.fs_snd || Flowstate_IsHaloMode() && Playlist() != ePlaylists.fs_haloMod_survival ) //todo: init single bool conditional
+	if( Gamemode() == eGamemodes.fs_spieslegends || Gamemode() == eGamemodes.fs_snd || ( Flowstate_IsHaloMode() && Playlist() != ePlaylists.fs_haloMod_survival ) ) //todo: init single bool conditional
 		return
 	
 	victim.StartObserverMode( OBS_MODE_DEATHCAM )
@@ -1137,6 +1140,33 @@ void function OnClientConnected( entity player )
 	player.Signal( "OnConnected" )
 	
 	thread Flowstate_CheckForLv4MagazinesAndRefillAmmo( player )
+	
+	if( file.bReserveAdminSlot )
+		CheckReservedSlotsForAdmin( player )
+}
+
+void function CheckReservedSlotsForAdmin( entity player )
+{
+	if( !IsClientCommandAdminEnabled() )
+		return
+		
+	string connectingPlayerUID = player.GetPlatformUID()
+	
+	if( IsServerAdmin( connectingPlayerUID ) )
+		return
+		
+	int maxPlayersForPlaylist = GetMaxPlayersForPlaylistName( GetCurrentPlaylistName() )
+	if( GetConnectedPlayerCount() >= maxPlayersForPlaylist )
+	{
+		foreach( s_player in GetPlayerArray() ) //(mk): This makes sure at least one admin is connected.
+		{
+			if( IsServerAdmin( s_player.GetPlatformUID() ) )
+				return
+		}
+		
+		string kickMessage = format( "The server is considered full. Rejoin when players reach [%d/%d]", maxPlayersForPlaylist - 2, maxPlayersForPlaylist )
+		KickPlayerById( connectingPlayerUID, kickMessage )
+	}
 }
 
 void function GiveInitialTeamToPlayer( entity player )

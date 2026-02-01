@@ -180,8 +180,11 @@ void function Cl_CustomTDM_Init()
 
 		case ePlaylists.fs_haloMod:
 			RegisterConCommandTriggeredCallback( "weaponSelectOrdnance", SetRecentWeapon )
+			
+		case ePlaylists.fs_realistic_ttv:
+			AddCallback_CharacterSelectMenu_OnCharacterLocked( RealisticTTVMode_OnSelectedLegend )
+			AddCallback_OnCharacterSelectMenuClosed( Gamemode1v1_OnLegendSelector_Close )
 		break
-
 	}
 
 	thread DisableChat_UntilRemoteIsReady_Thread()
@@ -213,8 +216,26 @@ void function Gamemode1v1_OnSelectedLegend( ItemFlavor character )
 				ScreenFade( GetLocalViewPlayer(), 255, 255, 255, 255, .1, 0, FFADE_PURGE | FFADE_INOUT | FFADE_NOT_IN_REPLAY )
 			}
 		)()
-
 	}
+}
+
+void function RealisticTTVMode_OnSelectedLegend( ItemFlavor character )
+{
+	entity player = GetLocalClientPlayer()
+	
+	thread 
+	(
+		void function() : ( player, character )
+		{
+			if( !IsValid( player ) )
+				return
+				
+			wait 0.5
+			RunUIScript( "Gamemode1v1_CloseLegendMenu" )
+			player.ClientCommand( "legend_select " + string( ItemFlavor_GetGUID( character ) ) )
+			ScreenFade( GetLocalViewPlayer(), 255, 255, 255, 255, .1, 0, FFADE_PURGE | FFADE_INOUT | FFADE_NOT_IN_REPLAY )
+		}
+	)()
 }
 
 void function mute( bool set )
@@ -557,12 +578,9 @@ void function FS_1v1_StartUpdatingValues( entity newEnt )
 	}
 }
 
-void function SetShow1v1Scoreboard( string show )
+void function SetShow1v1Scoreboard( int bShow )
 {
-	bool bShow = show == "0" ? false : true
-
-	file.show1v1Scoreboard = bShow
-
+	file.show1v1Scoreboard = bool ( bShow )
 	// Toggle1v1Scoreboard()
 }
 
@@ -668,7 +686,6 @@ void function Flowstate_RoundEndTimeChanged( entity player, float old, float new
 		// return
 
 	thread Flowstate_ShowRoundEndTimeUI( new )
-
 }
 
 void function SetRecentWeapon( entity player )
@@ -698,8 +715,11 @@ void function Flowstate_ShowRoundEndTimeUI( float new )
 	#endif
 	if( new == -1 || Playlist() == ePlaylists.fs_movementgym )
 	{
-		//force to hide
-		Signal( GetLocalClientPlayer(), "FSDM_EndTimer")
+		entity player = GetLocalClientPlayer()
+		if( !IsValid( player ) )
+			return 
+			
+		Signal( player, "FSDM_EndTimer")
 		Hud_SetVisible( HudElement( "FS_DMCountDown_Text" ), false )
 		Hud_SetVisible( HudElement( "FS_DMCountDown_Frame" ), false )
 		return
@@ -2598,7 +2618,9 @@ void function UiToClient_ConfirmRest( string arg )
 	if( IsValid( player ) )
 		player.ClientCommand( arg )
 
-	SpamWarning( 10, "confirmed rest? arg: \"" + arg + "\"" )
+	#if DEVELOPER
+		SpamWarning( 10, "confirmed rest? arg: \"" + arg + "\"" )
+	#endif
 }
 
 void function FS4DIntroSequence()
@@ -2735,18 +2757,18 @@ void function Send1v1SettingsToServer()
 {
 	entity player = GetLocalClientPlayer()
 
-	player.ClientCommand("CC_1v1_StartInRest " + GetConVarInt("fs_1v1_startinrest").tostring())
-	player.ClientCommand("CC_1v1_IBMM " + GetConVarInt("fs_1v1_ibmm").tostring())
-	player.ClientCommand("CC_1v1_AcceptChallenges " + GetConVarInt("fs_1v1_acceptchallenges").tostring())
-	player.ClientCommand("CC_1v1_ShowInputBanner " + GetConVarInt("fs_1v1_showinputbanner").tostring())
-	player.ClientCommand("CC_1v1_ShowVsUI " + GetConVarInt("fs_1v1_showvsui").tostring())
-	SetShow1v1Scoreboard( GetConVarInt("fs_1v1_showvsui").tostring() )
-
-	player.ClientCommand("CC_1v1_CamoColor " + GetConVarInt("fs_1v1_camo").tostring())
-	player.ClientCommand("CC_1v1_Heirloom " + GetConVarInt("fs_1v1_heirloom").tostring())
-
-	player.ClientCommand("CC_1v1_MaxEnemyLatency " + GetConVarInt("fs_1v1_maxenemylatency").tostring())
-	player.ClientCommand("CC_1v1_MaxIBMMTime " + GetConVarInt("fs_1v1_maxibmmtime").tostring())
+	player.ClientCommand( "CC_1v1_StartInRest " + GetConVarString( "fs_1v1_startinrest" ) )
+	player.ClientCommand( "CC_1v1_IBMM " + GetConVarString( "fs_1v1_ibmm" ) )
+	player.ClientCommand( "CC_1v1_AcceptChallenges " + GetConVarString( "fs_1v1_acceptchallenges" ) )
+	player.ClientCommand( "CC_1v1_ShowInputBanner " + GetConVarString( "fs_1v1_showinputbanner" ) )
+	player.ClientCommand( "CC_1v1_ShowVsUI " + GetConVarString( "fs_1v1_showvsui" ) )
+	SetShow1v1Scoreboard( GetConVarInt( "fs_1v1_showvsui" ) )
+	player.ClientCommand( "CC_1v1_CamoColor " + GetConVarString( "fs_1v1_camo" ) )
+	player.ClientCommand( "CC_1v1_Heirloom " + GetConVarString( "fs_1v1_heirloom" ) )
+	player.ClientCommand( "CC_1v1_MaxEnemyLatency " + GetConVarString( "fs_1v1_maxenemylatency" ) )
+	//more
+	
+	player.ClientCommand( "CC_1v1_MaxIBMMTime " + GetConVarString( "fs_1v1_maxibmmtime" ) ) //(mk): must be after CC_1v1_IBMM, as CC_1v1_IBMM will set 0|3. Should also always be last as it fires signal "SettingsReceieved"
 }
 
 void function FS_RestButton( entity player )
@@ -2816,19 +2838,35 @@ void function FS_1v1_DisplayHints( int state )
 			actualState = player.GetPlayerNetInt( "FS_1v1_PlayerState" )
 
 		string text = ""
+		string stopRestingText 		= Localize( "#STOP_RESTING" )
+		string matchSettingsText 	= Localize( "#MATCH_SETTINGS" )
+		string spectateText 		= Localize( "#SPECTATE" )
+		string stopSpectatingText	= Localize( "#STOP_SPECTATING" )
+		string scoreboardText 		= Localize( "#SCOREBOARD_TEXT" )
+		string restText				= Localize( "#REST" )
 
 		switch( actualState )
 		{
 			case e1v1State.RESTING:
-			text = "%scriptCommand5% STOP RESTING\n%scriptCommand3% SETTINGS\n%scriptCommand4% SPECTATE\n%toggle_map% SCOREBOARD"
+
+			text = format
+			( 
+				"%%scriptCommand5%% %s\n%%scriptCommand3%% %s\n%%scriptCommand4%% %s\n%%toggle_map%% %s",
+				stopRestingText,
+				matchSettingsText,
+				spectateText,
+				scoreboardText
+			)
 			break
 
 			case e1v1State.WAITING:
-			text = "%scriptCommand5% REST\n%toggle_map% SCOREBOARD"
+			
+			text = format( "%%scriptCommand5%% %s\n%%toggle_map%% %s", restText, scoreboardText )
 			break
 
 			case e1v1State.SPECTATING:
-			text = "%jump% STOP SPECTATING"
+			
+			text = format( "%%jump%% %s", stopSpectatingText )
 			break
 
 
@@ -2847,7 +2885,9 @@ void function FS_1v1_DisplayHints( int state )
 		// AddPlayerHint( 420.0, 0.15, $"", text )
 		Gamemode1v1_PermaHint( text )
 
-		printw( "FS_1v1_DisplayHints", player )
+		#if DEVELOPER
+			printt( "FS_1v1_DisplayHints", player )
+		#endif
 
 		OnThreadEnd(
 			function() : (text)

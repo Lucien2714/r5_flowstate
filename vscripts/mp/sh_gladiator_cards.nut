@@ -481,14 +481,6 @@ const array<string> BADGE_STAT_KEYS =
 	"badge_3"
 ]
 
-const array< string > STATS_TO_PRELOAD = 
-[
-	"badge_1",
-	"badge_2",
-	"badge_3",
-	"isDev",
-]
-
 // This setup is currently under development and experimental. 
 // Exists as a proof of concept.
 const array< string > UNLOCKED_BADGES =
@@ -579,14 +571,13 @@ BadgeData ornull function GetBadge( int GUID )
 }
 
 #if CLIENT
-
 	void function OnPlayerCreated( entity newPlayer )
 	{	
 		entity localPlayer = GetLocalClientPlayer()
 		if( newPlayer == localPlayer )
-			Tracker_PreloadStatArray( GetPlayerArray(), STATS_TO_PRELOAD )
+			Tracker_PreloadStatArray( GetPlayerArray(), BADGE_STAT_KEYS )
 		else
-			Tracker_PreloadStatArray( [ newPlayer ], STATS_TO_PRELOAD )
+			Tracker_PreloadStatArray( [ newPlayer ], BADGE_STAT_KEYS )
 	}
 #endif
 
@@ -659,7 +650,8 @@ void function CleanupNestedGladiatorCard( NestedGladiatorCardHandle handle, bool
 	ChangeNestedGladiatorCardOwner( handle, EHI_null )
 
 	if ( !isParentAlreadyDead )
-		RuiDestroyNestedIfAlive( handle.parentRui, handle.argName )
+		RuiDestroyNested( handle.parentRui, handle.argName )
+		
 	handle.parentRui = null
 	handle.cardRui = null
 
@@ -1899,7 +1891,7 @@ void function ActualUpdateNestedGladiatorCard( NestedGladiatorCardHandle handle 
 			if ( wantsBadges )
 			{
 				entity badgePlayer = FromEHI( handle.currentOwnerEHI )
-				//bool dev = IsValidPlayerForR5RDevBadge( badgePlayer )
+				//bool dev = IsValidPlayerForR5RDevBadge( badgePlayer ) //(mk): Deprecated, dev can just set the badge.
 				
 				bool bIsTrackerServer = expect bool ( GetServerVar( "tracker_enabled" ) )
 				int badge_1
@@ -1907,7 +1899,7 @@ void function ActualUpdateNestedGladiatorCard( NestedGladiatorCardHandle handle 
 				int badge_3
 				
 				if( bIsTrackerServer )
-				{
+				{					
 					var badge_1_stat = Tracker_FetchStat( badgePlayer, "badge_1" )
 					var badge_2_stat = Tracker_FetchStat( badgePlayer, "badge_2" )
 					var badge_3_stat = Tracker_FetchStat( badgePlayer, "badge_3" )
@@ -1937,13 +1929,10 @@ void function ActualUpdateNestedGladiatorCard( NestedGladiatorCardHandle handle 
 
 							case 1:
 							badgeOrNull = IsValidItemFlavorGUID( badge_2 ) ? GetItemFlavorByGUID( badge_2 ) : null
-							//badgeOrNull = GetItemFlavorByGUID( ConvertItemFlavorGUIDStringToGUID( "SAID01673450061" ) )
 							break
 
 							case 2:
 							badgeOrNull = IsValidItemFlavorGUID( badge_3 ) ? GetItemFlavorByGUID( badge_3 ) : null
-							//badgeOrNull = GetItemFlavorByGUID( ConvertItemFlavorGUIDStringToGUID( "SAID01774065557" ) )
-							//overrideDataIntegerOrNull = 100
 							break
 						}
 					}
@@ -2176,7 +2165,7 @@ void function ActualUpdateNestedGladiatorCard( NestedGladiatorCardHandle handle 
 	handle.updateQueued = false
 }
 
-bool function IsValidPlayerForR5RDevBadge( entity player ) //deprecated
+bool function IsValidPlayerForR5RDevBadge( entity player )
 {
 	if( !IsValid( player ) )
 		return false
@@ -2185,26 +2174,6 @@ bool function IsValidPlayerForR5RDevBadge( entity player ) //deprecated
 	{
 		return IsValidPlayerForR5RDevBadge_NoTracker( player )
 	}
-	
-	//not needed, isDev is preloaded on clients when player is created.
-	// if( !Tracker_StatExists( player, "isDev" ) )
-	// {
-		// Tracker_PreloadStat( player, "isDev" )
-		
-		// float startTime = Time()
-		// while( !Tracker_StatExists( player, "isDev" ) )
-		// {
-			// WaitFrame()
-			// if( Time() > startTime + MAX_PRELOAD_TIMEOUT )
-			// {
-				// #if DEVELOPER 
-					// printw( "Timeout while waiting for isDev stat from player", player )
-				// #endif 
-				
-				// break
-			// }
-		// }
-	// }
 	
 	var isDev = Tracker_FetchStat( player, "isDev" )
 	
@@ -3174,6 +3143,9 @@ void function UpdateRuiWithStatTrackerData_JustValue( var rui, string prefix, fl
 #if CLIENT
 void function OnPlayerLifestateChanged( entity player, int oldLifeState, int newLifeState )
 {
+	if( Playlist() == ePlaylists.fs_1v1 )
+		return
+
 	TriggerUpdateOfNestedGladiatorCardsForPlayer( player )
 
 	#if DEVELOPER

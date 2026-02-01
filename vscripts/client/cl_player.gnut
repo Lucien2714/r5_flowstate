@@ -2334,7 +2334,6 @@ void function FS_Toggle_Mute( bool toggle )
 		return
 		
 	string uid = player.GetPlatformUID()
-	// string cmd = "FS_TT " + chal.tostring()
 	
 	UpdatePlayerIsMuted( uid, toggle )
 	
@@ -2354,9 +2353,6 @@ void function FS_Toggle_Mute( bool toggle )
 		mute( false )
 		UpdateChatHUDVisibility()
 	}	
-	
-	// if( chal != 0 )
-		// player.ClientCommand( cmd )
 }
 
 //Nothing more than needed ( 4 funcs ). Struct is for future usage when the mute is by a player.
@@ -2414,7 +2410,7 @@ void function UpdatePlayerIsMuted( string uid, bool isMuted, bool byServer = tru
 		__UpdateMuteData( uid, isMuted, byServer, byClient )
 }
 
-void function FS_Silence( bool toggle, int eHandle )
+void function FS_Silence( bool toggle, int eHandle ) //(mk): deprecated, will be removed soon.
 {
 	entity player = GetEntityFromEncodedEHandle( eHandle )
 	if( !IsValid( player ) )
@@ -2442,7 +2438,7 @@ void function FS_RegisterAdmin()
 	if( !IsValid( player ) || !player.IsPlayer() )
 		return 
 	
-	RunUIScript( "UICallback_AdminStatus", Gamemode() == eGamemodes.WINTEREXPRESS ? false : player.GetPlayerNetBool("IsAdmin") )	
+	RunUIScript( "UICallback_AdminStatus", Gamemode() == eGamemodes.WINTEREXPRESS ? false : player.GetPlayerNetBool( "IsAdmin" ) )	
 }
 
 #if ENTITYVAR_DEPRECATED

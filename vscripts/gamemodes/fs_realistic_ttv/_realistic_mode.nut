@@ -50,10 +50,15 @@ struct DoorDataStruct
 
 struct 
 {
-	array< SpawnData > gamemodeSpawns = []
+	array< SpawnData > gamemodeSpawns
 	array< DoorDataStruct > trackedDoors
+	table< entity, ItemFlavor ornull > tbl_selectedLegends
 	
-	int iTrackedDoors = 0
+	int iTrackedDoors
+	float fRandomDummySpawnMinTime
+	float fRandomDummySpawnMaxTime
+	bool bLegendChangeEnabled
+	bool bAllowLegendAbilities
 
 } file 
 
@@ -80,6 +85,80 @@ void function RealisticMode_Init()
 		INIT_WeaponsMenu()
 	else 
 		INIT_WeaponsMenu_Disabled()
+		
+	if( GetCurrentPlaylistVarBool( "random_dummy_spawn", true ) )
+	{
+		file.fRandomDummySpawnMinTime = GetCurrentPlaylistVarFloat( "random_dummy_spawn_mintime", 100.0 )
+		file.fRandomDummySpawnMaxTime = GetCurrentPlaylistVarFloat( "random_dummy_spawn_maxtime", 250.0 )
+		thread SpawnDummyOnRandomPlayer_Thread()
+	}
+	
+	file.bLegendChangeEnabled = GetCurrentPlaylistVarBool( "allow_legend_select", false )
+	AddClientCommandCallbackVoid( "legend_select", AssignCharacter )
+	if( file.bLegendChangeEnabled )
+		AddCallback_OnClientDisconnected( CleanupCharacterTable )
+	
+	file.bAllowLegendAbilities = GetCurrentPlaylistVarBool( "realistic_mode_allow_legend_abilities", false )
+}
+
+void function AssignCharacter( entity player, array< string > args )
+{
+	if( !CheckRate( player, "legend_select", 1, true ) )
+		return
+
+	if( !file.bLegendChangeEnabled )
+	{
+		LocalMsg( player, "#FS_FAILED", "#FS_DisabledLegends" )
+		return
+	}
+				
+	if( !args.len() )
+		return
+		
+	if( !IsStringNumber( args[ 0 ] ) )
+		return
+		
+	int characterGUID = int( args[ 0 ] )	
+	
+	ItemFlavor ornull characterOrNull = GetItemFlavorOrNullByGUID( characterGUID )
+	if( characterOrNull == null )
+	{
+		#if DEVELOPER 
+			printf( "[REALISTIC MODE]: \"%d\" is not a valid character guid.", characterGUID )
+		#endif 
+		
+		return
+	}
+	
+	expect ItemFlavor ( characterOrNull )
+	if( ItemFlavor_GetType( characterOrNull ) != eItemType.character )
+		return 
+		
+	if( !ItemFlavor_ShouldBeVisible( characterOrNull, player ) )
+	{
+		LocalMsg( player, "#FS_FAILED", "#FS_InvalidLegend" )
+		return
+	}
+
+	if( !( player in file.tbl_selectedLegends ) )
+		file.tbl_selectedLegends[ player ] <- characterOrNull
+	else 
+		file.tbl_selectedLegends[ player ] = characterOrNull
+}
+
+void function CleanupCharacterTable( entity player )
+{
+	if( player in file.tbl_selectedLegends )
+		delete file.tbl_selectedLegends[ player ]
+}
+
+void function SpawnDummyOnRandomPlayer_Thread()
+{
+	for( ; ; )
+	{
+		wait RandomFloatRange( file.fRandomDummySpawnMinTime, file.fRandomDummySpawnMaxTime )
+		waitthread __SpawnDummy()
+	}
 }
 
 void function UpdateDestroyTime( entity door )
@@ -277,7 +356,7 @@ void function RealisticMode_GivePlayerBonusHeals( entity player, bool spawn = fa
 		foreach( ref in STANDARD_REALISTIC_KILL_LOOT )
 			SURVIVAL_AddToPlayerInventory( player, ref, 1 )
 	}
-	else 
+	else
 	{
 		foreach( ref in STANDARD_SPAWN_LOOT )
 			SURVIVAL_AddToPlayerInventory( player, ref, 1 )
@@ -298,24 +377,49 @@ void function RealisticMode_OnSpawned( entity player )
 	(
 		void function() : ( player )
 		{
-			wait 3 //todo, unweave fsdm logic
-			
 			if( !IsValid( player ) )
 				return
+				
+			player.EndSignal( "OnDestroy", "OnDeath" )	
+			wait 3 //todo, unweave fsdm logic
 			
+			Inventory_SetPlayerEquipment( player, "", "helmet" )
 			player.TakeOffhandWeapon( OFFHAND_SLOT_FOR_CONSUMABLES )
-			player.GiveOffhandWeapon( CONSUMABLE_WEAPON_NAME, OFFHAND_SLOT_FOR_CONSUMABLES, [] )
 			player.TakeNormalWeaponByIndexNow( WEAPON_INVENTORY_SLOT_PRIMARY_2 )
 			player.TakeOffhandWeapon( OFFHAND_MELEE )
-			player.GiveWeapon( "mp_weapon_melee_survival", WEAPON_INVENTORY_SLOT_PRIMARY_2, [] )
-			player.GiveOffhandWeapon( "melee_pilot_emptyhanded", OFFHAND_MELEE, [] )	
+			
+			WaitFrame()
 
 			RealisticMode_GivePlayerBonusHeals( player, true )	
+			
+			bool bHasValidLegend
+			if( file.bLegendChangeEnabled )
+			{
+				if( ( player in file.tbl_selectedLegends ) && file.tbl_selectedLegends[ player ] != null )
+				{		
+					ItemFlavor ornull character = file.tbl_selectedLegends[ player ]
+					if( character == null )
+						return
+						
+					bHasValidLegend = true	
+					expect ItemFlavor ( character )
+					CharacterSelect_AssignCharacter( ToEHI( player ), character )
+				}
+			}
+			
+			if( file.bAllowLegendAbilities && bHasValidLegend )
+				GiveLoadoutRelatedWeapons( player )
+			else
+			{
+				player.GiveOffhandWeapon( CONSUMABLE_WEAPON_NAME, OFFHAND_SLOT_FOR_CONSUMABLES, [] )
+				player.GiveWeapon( "mp_weapon_melee_survival", WEAPON_INVENTORY_SLOT_PRIMARY_2, [] )
+				player.GiveOffhandWeapon( "melee_pilot_emptyhanded", OFFHAND_MELEE, [] )
+			}
 		}
 	)()
 }
 
-//taken from fsdm, same function
+//taken from fsdm, similar function
 LocPair function RealisticMode_GetBestSpawnPointFFA()
 {	
 	table<LocPair, float> SpawnsAndNearestEnemy = {}
@@ -366,4 +470,53 @@ bool function MessagePlayer_Disabled( entity player, array<string> args )
 {
 	LocalEventMsg( player, "#FS_DisabledTDMWeps" )
 	return true
+}
+
+void function __SpawnDummy( int team = 99 ) //taken from ai util
+{
+	if( !GetPlayerArray().len() )
+		return 
+		
+	entity player = GetPlayerArray().getrandom()
+
+	vector origin = GetPlayerCrosshairOrigin( player )
+	vector org2 = player.GetOrigin()
+	vector vec1 = org2 - origin
+	vector angles1 = VectorToAngles( vec1 )
+	angles1.x = 0
+	
+	entity dummy = CreateDummy( team, origin, angles1 )
+	SetSpawnOption_AISettings( dummy, "npc_dummie_combat" )
+
+	int shield = 100
+	int shieldskin = 1
+
+	DispatchSpawn( dummy )
+	dummy.SetOrigin( origin )
+	dummy.SetShieldHealthMax( shield )
+	dummy.SetShieldHealth( shield )
+	dummy.SetMaxHealth( 100 )
+	dummy.SetHealth( 100 )
+	dummy.SetTakeDamageType( DAMAGE_YES )
+	dummy.SetDamageNotifications( true )
+	dummy.SetDeathNotifications( true )
+	dummy.SetValidHealthBarTarget( true )
+	SetObjectCanBeMeleed( dummy, true )
+	dummy.DisableHibernation()
+	dummy.SetAngles(angles1)
+	dummy.SetEfficientMode( false )
+	dummy.RemoveFromAllRealms()
+	dummy.AddToOtherEntitysRealms( player )
+
+    array<string> weapons = ["npc_weapon_hemlok", "npc_weapon_energy_shotgun", "npc_weapon_lstar"]
+    string randomWeapon = weapons[ RandomInt( weapons.len() ) ]
+    dummy.GiveWeapon( randomWeapon, WEAPON_INVENTORY_SLOT_ANY )
+	
+	weapons.fastremovebyvalue( randomWeapon )
+	randomWeapon = weapons[ RandomInt( weapons.len() ) ]
+	dummy.GiveWeapon( randomWeapon, WEAPON_INVENTORY_SLOT_ANY )
+	
+	dummy.EnableNPCFlag( NPC_IGNORE_ALL )
+	wait RandomFloatRange( 2.0, 5.0 )
+	dummy.DisableNPCFlag( NPC_IGNORE_ALL )
 }

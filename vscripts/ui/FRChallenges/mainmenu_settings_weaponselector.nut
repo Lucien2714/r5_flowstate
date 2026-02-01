@@ -28,6 +28,9 @@ void function OpenFRChallengesSettingsWpnSelector()
 	Hud_SetSelected( Hud_GetChild( file.menu, "SelectSecondaryWeapon"), false )
 	RunClientScript("SetWeaponSlot", 1)	
 	SetWeaponSwitcherVisible( true )
+	
+	bool resetButtonVisible = Playlist() != ePlaylists.fs_aimtrainer
+	Hud_SetVisible( Hud_GetChild( file.menu, "ResetSelectedWeapons"), resetButtonVisible )
 }
 
 void function CloseFRChallengesSettingsWpnSelector()
@@ -70,6 +73,7 @@ void function InitFRChallengesSettingsWpnSelector( var newMenuArg )
 	
 	AddButtonEventHandler( Hud_GetChild( file.menu, "SelectPrimaryWeapon"), UIE_CLICK, SelectPrimaryWeaponFunct )
 	AddButtonEventHandler( Hud_GetChild( file.menu, "SelectSecondaryWeapon"), UIE_CLICK, SelectSecondaryWeaponFunctFunct )
+	AddButtonEventHandler( Hud_GetChild( file.menu, "ResetSelectedWeapons"), UIE_CLICK, ResetSelectedWeaponsFunc )
 	
 	Hud_SetSelected( Hud_GetChild( file.menu, "SelectPrimaryWeapon"), true )
 }
@@ -102,6 +106,11 @@ void function SelectSecondaryWeaponFunctFunct(var button)
 	Hud_SetSelected( Hud_GetChild( file.menu, "SelectPrimaryWeapon"), false )
 	Hud_SetSelected( Hud_GetChild( file.menu, "SelectSecondaryWeapon"), true )
 	RunClientScript("SetWeaponSlot", 2)
+}
+
+void function ResetSelectedWeaponsFunc( var button )
+{
+	ClientCommand( "resetguns" )
 }
 
 void function GoBackButtonFunct(var button)

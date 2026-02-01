@@ -9,6 +9,7 @@ global function GetUIVar
 
 global function ServerCallback_SetUIVar
 global function RegisterUIVarChangeCallback
+global function UIVarExists
 
 #if SERVER
 	global function SyncUIVars
@@ -40,6 +41,7 @@ void function UIVars_Init()
 	RegisterUIVar( "forceLoadoutEnabled", false )
 	RegisterUIVar( "survivorTitanfallTime", 0 )
 	RegisterUIVar( "putPlayerInMatchmakingAfterDelay", false )
+	RegisterUIVar( "tracker_enabled", false )
 }
 
 void function RegisterUIVar( string varName, value )
@@ -54,6 +56,11 @@ void function RegisterUIVar( string varName, value )
 	_nextUIVarIndex++
 
 	_uiVars[varName] <- value
+}
+
+function UIVarExists( string varName )
+{
+	return ( varName in _uiVars )
 }
 
 // Hooked up in code to .ui
@@ -77,7 +84,9 @@ void function SetUIVar( table<string,var> obj, string varName, value )
 	_uiVars[varName] = value
 
 	// Run change callback if one exists
-	thread UIVarChangedCallbacks( varName )
+	//(mk): Don't spawn thread if not needed)
+	if ( ( varName in _uiVarChangeCallbacks ) )
+		thread UIVarChangedCallbacks( varName )
 
 	// Update the var on all clients
 	array<entity> players = GetPlayerArray()

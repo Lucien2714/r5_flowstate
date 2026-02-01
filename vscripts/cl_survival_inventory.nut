@@ -647,27 +647,26 @@ bool function CanOpenInventory( entity player )
 
 void function TrackDistanceFromDeathBox( entity player, entity deathBox )
 {
-	player.EndSignal( "OnDeath" )
-	deathBox.EndSignal( "OnDestroy" )
+	if( !IsValid( player ) ) //(mk): this is spun off.
+		return 
 	
-	// if( PlayerSetting_DamageClosesMenu() )
-	// {
-		// player.EndSignal( "OnDamaged" )
-	// }
-
 	OnThreadEnd
 	(
-		function() : ( player )
+		void function() : ( player )
 		{
 			if( Gamemode() == eGamemodes.fs_aimtrainer )
 				Signal( player, "StopArmorSwapStopwatch" )
 			
 			if ( Survival_IsGroundlistOpen() )
-			{
 				RunUIScript( "TryCloseSurvivalInventory", null )
-			}
 		}
 	)
+	
+	player.EndSignal( "OnDeath" )
+	deathBox.EndSignal( "OnDestroy" )
+	
+	if( PlayerSetting_DamageClosesMenu() )
+		player.EndSignal( "OnDamaged" ) //(mk): this reflects the user's setting for on damage closes menu.
 
 	WaitFrame()
 

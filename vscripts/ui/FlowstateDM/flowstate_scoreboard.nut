@@ -1,3 +1,5 @@
+//(mk): This script isn't added to scripts.rson. old 
+
 global function Init_FSDM_VoteMenu
 global function Open_FSDM_VotingPhase
 global function Close_FSDM_VoteMenu

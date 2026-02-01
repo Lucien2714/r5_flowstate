@@ -70,7 +70,6 @@ global function Flowstate_IsRealisticMode
 global function Halo_GotoNextPlaylist
 global function HaloMod_HandlePlayerModel
 global function EndRound
-
 global function PrimaryWeaponMetagame_Init
 global function FS_GiveRandomMelee
 #if DEVELOPER
@@ -79,7 +78,8 @@ global function FS_GiveRandomMelee
 
 //Beginning of refactor( supposed to be for next, next release.. )
 global function AddCallback_OnTdmStateEnter_InProgress
-
+global function AddCallback_OnTdmStateEnter_EndGame
+global function AddFSCallback_ShouldTimerEnd
 
 global function Message_New //deprecated, use LocalEventMsg() ~mkos
 global function ServerMsgToBox //not used
@@ -93,6 +93,7 @@ global function ClientCommand_GiveWeapon
 global function ValidateWeaponTgiveSettings
 global function GetCommunityHeirlooms
 global function FS_InitCommunityHeirlooms
+
 
 const string WHITE_SHIELD = "armor_pickup_lv1"
 const string BLUE_SHIELD = "armor_pickup_lv2"
@@ -169,6 +170,7 @@ struct
 	int winnerTeam
 	
 	array< void functionref() > tdmStateInProgressCallbacks
+	array< void functionref() > tdmStateEndGameCallbacks
 	bool bIsChampionShowing
 	table<string, LocationSettings> locationSettingsMap = {}
 	
@@ -179,6 +181,9 @@ struct
 	
 	array<Heirloom> heirlooms
 	array<ItemFlavor> characters
+	
+	bool functionref( int ) ShouldTimerEnd = null
+
 } file
 
 struct
@@ -293,6 +298,14 @@ void function InitializePlaylistSettings()
 	flowstateSettings.show_short_champion_screen			= GetCurrentPlaylistVarBool( "show_short_champion_screen", true )
 	flowstateSettings.bIsRealisticMode 						= Playlist() == ePlaylists.fs_realistic_ttv
 	flowstateSettings.give_weapon_stack_count_amount		= GetCurrentPlaylistVarInt( "give_weapon_stack_count_amount", 0 )
+}
+
+void function AddFSCallback_ShouldTimerEnd( bool functionref( int ) callbackFunc )
+{
+	if( file.ShouldTimerEnd != null )
+		mAssert( 0, "Tried to add callback %s with %s but it was already set as %s", string( callbackFunc ), FUNC_NAME(), string( file.ShouldTimerEnd ) )
+
+	file.ShouldTimerEnd = callbackFunc
 }
 
 bool function Flowstate_IsRealisticMode()
@@ -513,6 +526,9 @@ void function _CustomTDM_Init()
 	
 	if( is1v1EnabledAndAllowed() )
 		Gamemode1v1_Init( MapName() )
+		
+	if( Playlist() == ePlaylists.fs_grapples_n_guns )
+		GrapplesNGunsInit()
 }
 
 void function __OnEntitiesDidLoadCTF()
@@ -708,12 +724,26 @@ void function SetTdmStateToInProgress()
 		callbackFunc()
 }
 
+void function RunRoundEndCallbacks()
+{
+	foreach( callbackFunc in file.tdmStateEndGameCallbacks )
+		callbackFunc()
+}
+
 void function AddCallback_OnTdmStateEnter_InProgress( void functionref() callbackFunc )
 {
 	if( file.tdmStateInProgressCallbacks.contains( callbackFunc ) )
-		mAssert( false, "Tried to add callbackFunc: " + string( callbackFunc ) + "() but already exists in tdmStateInProgressCallbacks" )
+		mAssert( 0, "Tried to add callbackFunc: " + string( callbackFunc ) + "() but already exists in tdmStateInProgressCallbacks" )
 
 	file.tdmStateInProgressCallbacks.append( callbackFunc )
+}
+
+void function AddCallback_OnTdmStateEnter_EndGame( void functionref() callbackFunc )
+{
+	if( file.tdmStateEndGameCallbacks.contains( callbackFunc ) )
+		mAssert( 0, "Tried to add callbackFunc: " + string( callbackFunc ) + "() but already exists in tdmStateEndGameCallbacks" )
+
+	file.tdmStateEndGameCallbacks.append( callbackFunc )
 }
 
 void function Flowstate_ServerSaveChat()
@@ -1240,7 +1270,8 @@ void function _OnPlayerDied( entity victim, entity attacker, var damageInfo )
 						decidedWaitTime = STATIC_WAIT_TIME
 				}
 					
-				Remote_CallFunction_ByRef( victim, "ForceScoreboardLoseFocus" )
+				if( Playlist() != ePlaylists.fs_realistic_ttv )
+					Remote_CallFunction_ByRef( victim, "ForceScoreboardLoseFocus" )
 				
 				//(mk): I originally intended this to be apart of a lifestate change or YouDied callback, and setting UpdateNextRespawnTime( entity player, float time ), client using: GetNextRespawnTime( player )  but due to various mode behavior, it's better left as a remote func call.
 				Remote_CallFunction_Replay( victim, "Flowstate_ShowRespawnTimeUI", int( DEATHCAM_TIME_SHORT + decidedWaitTime ) )//+ DEATHCAM_TIME_SHORT ) )
@@ -1533,15 +1564,22 @@ void function _HandleRespawn( entity player, bool isDroppodSpawn = false )
 			
             foreach ( storedWeapon in weapons )
             {
-                if ( !storedWeapon.name.len() ) continue
-                if( storedWeapon.weaponType == eStoredWeaponType.main)
+                if ( storedWeapon.name == "" ) 
+					continue
+				
+                if( storedWeapon.weaponType == eStoredWeaponType.main )
 				{
 					try
 					{
 						entity givenWeapon = player.GiveWeapon( storedWeapon.name, storedWeapon.inventoryIndex, storedWeapon.mods )
 						SetupInfiniteAmmoForWeapon( player, givenWeapon )
 					}
-					catch(e420){}
+					catch( e420 )
+					{
+						#if DEVELOPER 
+							sqerror( "Error:" + e420 )
+						#endif 
+					}
 				}
                 else
 				{
@@ -1634,10 +1672,12 @@ void function _HandleRespawn( entity player, bool isDroppodSpawn = false )
 				printw("GiveFSDMWeapons ERROR - ", player, "failed to get weapons" )
 				#endif
 			}
-		} else if( FlowState_Gungame() ) // Gungame (broken atm)
+		} 
+		else if( FlowState_Gungame() ) // Gungame (broken atm)
 		{
 			GiveGungameWeapon(player) // !FIXME qué le pasó a esto? lol
-		} else if( flowstateSettings.hackersVsPros  ) // Hackers vs pros (broken atm)
+		} 
+		else if( flowstateSettings.hackersVsPros  ) // Hackers vs pros (broken atm)
 		{
 			TakeAllWeapons(player)
 			GiveRandomPrimaryWeaponMetagame(player)
@@ -1692,7 +1732,8 @@ void function _HandleRespawn( entity player, bool isDroppodSpawn = false )
 				printw("GiveFSDMWeapons ERROR - ", player, "failed to get weapons" )
 				#endif
 			}
-		} else if(FlowState_RandomGunsEverydie() ) // FS Fiesta (broken atm)
+		} 
+		else if(FlowState_RandomGunsEverydie() ) // FS Fiesta (broken atm)
 		{
 			try{
 				TakeAllWeapons(player)
@@ -3624,8 +3665,12 @@ void function SimpleChampionUI()
 		//// 	CORE TIMER LOOP 	////
 		////////////////////////////////
 		
-		while( Time() <= g_fCurrentRoundEndTime && file.tdmState == eTDMState.IN_PROGRESS ) //Todo: Execute callbacks for gamemode and add via AddCallback_ShouldTimerEnd( int timeRemaining, bool functionref() condFunc )
+		bool hasTimerCallback = file.ShouldTimerEnd != null
+		while( Time() <= g_fCurrentRoundEndTime && file.tdmState == eTDMState.IN_PROGRESS ) //Todo(mk): Execute callbacks for gamemode and add via AddFSCallback_ShouldTimerEnd( int timeRemaining, bool functionref() condFunc ) //done
 		{
+			if( hasTimerCallback && file.ShouldTimerEnd( ( g_fCurrentRoundEndTime - Time() ).tointeger() ) )
+				break
+		
 			if( flowstateSettings.hackersVsPros )
 			{
 				foreach(player in GetPlayerArray())
@@ -3707,6 +3752,8 @@ void function SimpleChampionUI()
 	////////////////////////////////
 	//////// 	TIMER END 	////////
 	////////////////////////////////
+	
+	RunRoundEndCallbacks()
 
 	if( flowstateSettings.enable_oddball_gamemode && file.winnerTeam == -1 )
 	{
@@ -5253,23 +5300,23 @@ bool function ClientCommand_GiveWeapon(entity player, array<string> args)
 		return true
 	}
 
-	if (is1v1EnabledAndAllowed())
+	if ( is1v1EnabledAndAllowed() )
 	{
 		bRestFlag = Gamemode1v1_IsPlayerResting( player )
 
-		if (Gamemode1v1_IsPlayerWaiting(player))
+		if ( Gamemode1v1_IsPlayerWaiting( player ) )
 		{
 			LocalMsg( player, "#FS_NotAllowedWaiting", "", uiType )
 			return true
 		}
 
-		if (!Gamemode1v1_AreCustomWeaponsAllowedForPlayer( player ))
+		if ( !Gamemode1v1_AreCustomWeaponsAllowedForPlayer( player ) )
 		{
 			LocalMsg( player, "#FS_CustomWepChalOnly", "", uiType )
 			return true
 		}
 
-		if (args[0] != "p" && args[0] != "s")
+		if ( args[0] != "p" && args[0] != "s" )
 			return true
 	}
 
@@ -5406,14 +5453,14 @@ bool function ClientCommand_GiveWeapon(entity player, array<string> args)
 	string sWepName = ""
 
 	if( !Gamemode1v1_AreCustomWeaponsAllowedForPlayer( player ) )
-		subToken = "#FS_CUSTOM_WEAPON_CHAL_ONLY" // Host only allows custom weapons during a challenge
+		subToken = "#FS_CUSTOM_WEAPON_CHAL_ONLY" //(mk): Host only allows custom weapons during a challenge
 
 	if( ClientCommand_SaveCurrentWeapons( player, ["1"] ) )
 		sWepName = weapon.GetWeaponSettingString( eWeaponVar.printname )		
 	
 	LocalMsg( player, "#FS_WEAPONSAVED", subToken, uiType, 5, sWepName )
 		
-	// If the player is currently resting, do not let them use the weapons until they enter a match
+	//(mk): If the player is currently resting, do not let them use the weapons until they enter a match
 	if (bRestFlag)
 		HolsterAndDisableWeapons_Raw( player )
 
@@ -5651,9 +5698,9 @@ void function LoadCustomWeapon( entity player )
 		{
 			player.SetActiveWeaponBySlot( eActiveInventorySlot.mainHand, WEAPON_INVENTORY_SLOT_PRIMARY_1 )
 		}
-		else 
+		else
 		{
-			#if DEVELOPER && HAS_TRACKER_DLL
+			#if DEVELOPER
 				sqerror("Player: " + player.GetPlatformUID() + " has no valid weapon to set: Active" )
 			#endif
 		}
@@ -7473,7 +7520,9 @@ void function FS_Hack_CreateBulletsCollisionVolume( vector origin, float large =
 		file.playerSpawnedProps.append( wall )
 	}
 
-	Warning("Spawned collision volume with walls centered for custom map")
+	#if DEVELOPER
+		Warning("Spawned collision volume with walls centered for custom map")
+	#endif
 	
 	//Install a oob trigger in all maps
 	file.playerSpawnedProps.append( AddOutOfBoundsTriggerWithParams( origin + <0,0,800>, large, 2000 ) )
@@ -7521,10 +7570,12 @@ void function FS_GiveRandomMelee(entity player, bool is1v1 = false )
 	// printw("FS_GiveRandomMelee", player)
 	// #endif
 	
-	Heirloom randomMelee = GetCommunityHeirlooms().getrandom() //todo(cafe): allow players to choose heirloom? possibly a new menu for "cosmetics" where players can choose the heirloom and camo color with persistence
+	Heirloom randomMelee //todo(cafe): allow players to choose heirloom? possibly a new menu for "cosmetics" where players can choose the heirloom and camo color with persistence
 	
 	if( is1v1 )
 		randomMelee = GetCommunityHeirlooms()[player.p.chosenHeirloom]
+	else 
+		randomMelee = GetCommunityHeirlooms().getrandom()
 	
 	player.TakeNormalWeaponByIndexNow( WEAPON_INVENTORY_SLOT_PRIMARY_2 )
 	player.TakeOffhandWeapon( OFFHAND_MELEE )	

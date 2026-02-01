@@ -5,8 +5,10 @@ global function Timeout_IsUIDTimedOut
 global function Timeout_GetTimeoutPlayers
 global function Timeout_SetPlayerTimedOut
 global function Timeout_PrintTimeoutData
-global function CodeCallback_TimeoutCommand
+global function Timeout_GetDefaultTimeoutAmount
+global function Timeout_GetTimeoutExpiresTimestamp
 
+global function CodeCallback_TimeoutCommand
 global function AddCallback_TimedOut
 
 struct TimeoutData
@@ -101,6 +103,16 @@ void function __AutoUnTimeoutPlayer( entity player ) //✓
 	}
 }
 
+int function Timeout_GetTimeoutExpiresTimestamp( entity player )
+{
+	int currentTimestamp = GetUnixTimestamp()
+	
+	if( !IsValid( player ) || !Timeout_IsPlayerTimedOut( player ))
+		return currentTimestamp
+
+	return __GetTimeoutExpiresTimestamp( player )
+}
+
 int function __GetTimeoutExpiresTimestamp( entity player ) //✓
 {
 	return file.m_timedoutPlayers[ player.p.UID ].iTimeoutExpiresTimestamp
@@ -129,7 +141,7 @@ bool function Timeout_SetPlayerTimedOut( entity player, bool toggle = true, stri
 	
 	player.Signal( "NewTimeout" )
 	
-	iTimeoutAmount = iTimeoutAmount != -1 ? iTimeoutAmount : settings.iDefaultiTimeoutAmount
+	iTimeoutAmount = iTimeoutAmount > 0 ? iTimeoutAmount : settings.iDefaultiTimeoutAmount
 	
 	TimeoutData timeoutData
 	
@@ -165,7 +177,7 @@ string function Timeout_PrintTimeoutData( entity player )//✓
 		printData = format
 		(
 			"Expiration: %s\nTimeout Amount: %d\nReason: %s, Timeout By: %s",
-			Chat_ReadableTime( td.iTimeoutExpiresTimestamp ),
+			Chat_ReadableExpiresTime( td.iTimeoutExpiresTimestamp ),
 			td.iTimeoutAmount,
 			td.sReason,
 			td.sByPlayer
@@ -173,6 +185,11 @@ string function Timeout_PrintTimeoutData( entity player )//✓
 	}
 	
 	return printData
+}
+
+int function Timeout_GetDefaultTimeoutAmount()
+{
+	return settings.iDefaultiTimeoutAmount
 }
 
 TimeoutData function __GetTimedOutPlayer( entity player )//✓
@@ -223,7 +240,7 @@ string function GetFormatterValueForPlayer( entity player, string formatter )//�
 			return ( player.GetLatency() * 1000 ).tostring()
 			
 		case "#expires":
-			return Chat_ReadableTime( __GetTimeoutExpiresTimestamp( player ) )
+			return Chat_ReadableExpiresTime( __GetTimeoutExpiresTimestamp( player ) )
 		
 		case "#reason":
 			return __GetTimedOutPlayer( player ).sReason

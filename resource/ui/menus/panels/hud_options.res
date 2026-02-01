@@ -472,14 +472,15 @@
         childGroupAlways        ChoiceButtonAlways
     }
 	
-	SwitchShowMotd
+	SwitchEnableMotd
     {
         ControlName				RuiButton
         InheritProperties		SwitchButton
         style					DialogListButton
         navUp					SwitchChatMessages [!$GAMECONSOLE]
 		navUp					SwchChatSpeechToText [$GAMECONSOLE]
-        ConVar					"motd_enable"
+		navDown					SwitchShowMotd
+        ConVar					"enable_motd"
         list
         {
             "#SETTING_OFF"	0
@@ -490,6 +491,27 @@
 
         pin_to_sibling			SwitchChatMessages [!$GAMECONSOLE]
 		pin_to_sibling			SwchChatSpeechToText [$GAMECONSOLE]
+        pin_corner_to_sibling	TOP_LEFT
+        pin_to_sibling_corner	BOTTOM_LEFT
+        childGroupAlways        ChoiceButtonAlways
+    }
+	
+	SwitchShowMotd
+    {
+        ControlName				RuiButton
+        InheritProperties		SwitchButton
+        style					DialogListButton
+        navUp					SwitchEnableMotd
+        ConVar					"open_motd_once_per_server"
+        list
+        {
+            "#SETTING_OFF"	0
+            "#SETTING_ON"	1
+        }
+
+        visible                 1
+
+        pin_to_sibling			SwitchEnableMotd
         pin_corner_to_sibling	TOP_LEFT
         pin_to_sibling_corner	BOTTOM_LEFT
         childGroupAlways        ChoiceButtonAlways

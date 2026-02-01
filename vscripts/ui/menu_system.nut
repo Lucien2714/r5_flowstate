@@ -59,6 +59,7 @@ struct
 	table<var, ButtonData > OpenChampionCard
 	table<var, ButtonData > CoachingStartAgain
 	table<var, ButtonData > CoachingStop
+	table<var, ButtonData > LegendSelect
 	
 	InputDef& qaFooter
 	
@@ -202,6 +203,7 @@ void function InitSystemPanel( var panel )
 	file.OpenChampionCard[ panel ] <- clone data
 	file.CoachingStartAgain[ panel ] <- clone data
 	file.CoachingStop[ panel ] <- clone data
+	file.LegendSelect[ panel ] <- clone data
 	
 	file.ExitChallengeButtonData[ panel ].label = "#FS_FINISH_CHALLENGE"
 	file.ExitChallengeButtonData[ panel ].activateFunc = SignalExitChallenge
@@ -299,6 +301,9 @@ void function InitSystemPanel( var panel )
 	file.CoachingStop[ panel ].label = "STOP RECORDING"
 	file.CoachingStop[ panel ].activateFunc = OpenCoachingStop
 	
+	file.LegendSelect[ panel ].label = "#SELECT_LEGEND"
+	file.LegendSelect[ panel ].activateFunc = OpenSelectLegend
+	
 	AddPanelEventHandler( panel, eUIEvent.PANEL_SHOW, SystemPanelShow )
 }
 
@@ -345,7 +350,8 @@ void function UpdateSystemPanel( var panel )
 			// SetButtonData( panel, buttonIndex++, file.Toggle1v1ScoreboardFocus[ panel ] )
 			SetButtonData( panel, buttonIndex++, file.ToggleRest[ panel ] )
 			SetButtonData( panel, buttonIndex++, file.OpenWeaponsMenu[ panel ] )
-		} else if( Playlist() == ePlaylists.fs_1v1_coaching )
+		} 
+		else if( Playlist() == ePlaylists.fs_1v1_coaching )
 		{
 			if( GetGlobalNetBool( "FS_Coaching_IsPlayingRecording" ) && uiGlobal.bIsServerAdmin )
 			{
@@ -365,8 +371,11 @@ void function UpdateSystemPanel( var panel )
 			SetButtonData( panel, buttonIndex++, file.ToggleRest[ panel ] )
 		}
 		
-		// if( Flowstate_IsTrackerSupportedMode() ) // (cafe) it should check for tracker enabled as well, disabled for now
-			// SetButtonData( panel, buttonIndex++, file.OpenChampionCard[ panel ] )
+		if( uiGlobal.is1v1GameType && Playlist() != ePlaylists.fs_1v1_coaching || Playlist() == ePlaylists.fs_realistic_ttv )
+			SetButtonData( panel, buttonIndex++, file.LegendSelect[ panel ] )
+		
+		if( Flowstate_IsTrackerSupportedMode() && UIVarExists( "tracker_enabled" ) && GetUIVar( null, "tracker_enabled" ) )
+			SetButtonData( panel, buttonIndex++, file.OpenChampionCard[ panel ] )
 
 		if( Playlist() == ePlaylists.fs_lgduels_1v1 || Playlist() == ePlaylists.fs_dm_fast_instagib )		
 			SetButtonData( panel, buttonIndex++, file.OpenLGDuelsSettingsData[ panel ] )
@@ -493,7 +502,7 @@ void function UpdateSystemPanel( var panel )
 			msgonbottom = "FS DM - Ping: " + MyPing() + " ms."
 			break
 			
-			case ePlaylists.fs_dm:
+			case ePlaylists.fs_realistic_ttv:
 			msgonbottom = "Realistic TTV - Ping: " + MyPing() + " ms."
 			break
 			
@@ -587,7 +596,7 @@ void function OpenSettingsMenu()
 void function HostEndMatch()
 {
 	#if LISTEN_SERVER
-	CreateServer( GetPlayerName() + " Lobby", "", "mp_lobby", "dev_default", eServerVisibility.OFFLINE )
+		CreateServer( GetPlayerName() + " Lobby", "", "mp_lobby", "dev_default", eServerVisibility.OFFLINE )
 	#endif // LISTEN_SERVER
 }
 
@@ -661,6 +670,15 @@ void function OpenCoachingStop()
 	ClientCommand( "coaching_stop" )
 }
 	
+void function OpenChampionCard()
+{
+	RunClientScript( "SelfShowChampion" )
+}
+
+void function OpenSelectLegend()
+{
+	RunClientScript( "OpenCharacterSelectAimTrainer", true )
+}
 
 void function ReturnToMain_OnActivate( var button )
 {
@@ -709,12 +727,10 @@ void function SetMotdText( string text )
 {
 	file.motdText = text + file.motdText
 	
-	// auto-opening motd disabled as per amos request
-
-	if( !GetConVarInt( "motd_enable" ) )
+	if( !GetConVarBool( "enable_motd" ) )
 		return
 
-	if ( GetConVarBool( "motd_once_per_server" ) )
+	if ( GetConVarBool( "open_motd_once_per_server" ) )
 	{
 		string server = GetServerID()
 	
@@ -726,7 +742,7 @@ void function SetMotdText( string text )
 	}
 	else
 	{
-		// Just open it.
+		//(mk): Just open it always.
 		OpenMOTD()
 	}
 }
@@ -753,15 +769,10 @@ void function OpenMOTD()
 		if( motdLocaliziedExtended != "" && motdLocaliziedExtended != "#MOTD_TEXT" )
 			motd = motd + motdLocaliziedExtended	
 		
-		file.motdText = motd //save for repeat opens
+		file.motdText = motd //(mk): save for repeat opens
 	}
 	
 	OpenServerMOTD( motd )
-}
-
-void function OpenChampionCard()
-{
-	RunClientScript( "SelfShowChampion" )
 }
 
 void function UpdateOptInFooter()

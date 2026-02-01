@@ -283,6 +283,7 @@ void function Gamemode1v1_Init( int eMap )
 	
 	RegisterSignal( "ChallengeStarted" )
 	RegisterSignal( "ChallengeEnded" )
+	RegisterSignal( "SettingsReceieved" )
 	
 	PrecacheOITCRoom()
 	
@@ -620,8 +621,26 @@ void function FS1v1_OnEntitiesDidLoad()
 					Remote_CallFunction_NonReplay( player, "ServerCallback_SpawnOrModifyClientSideDynamicLight", <-1601.14001, -890.200745, 21468.5039>, < 0, 0, 0 >, 1, 1024, 2.0, 2 )//jumppads area
 					Remote_CallFunction_NonReplay( player, "ServerCallback_SpawnOrModifyClientSideDynamicLight", <918.127991, -1166.38794, 20793.8203>, < 0, 0, 0 >, 0, 1024, 2.0, 3 ) //çourse
 					Remote_CallFunction_NonReplay( player, "ServerCallback_SpawnOrModifyClientSideDynamicLight", <-51.4564667, -2055.91406, 20776.9473>, < 0, 0, 0 >, 0, 1024, 2.0, 4 ) //çourse
-				break
-			
+				break		
+			}
+		
+			if( GetTDMState() == eTDMState.IN_PROGRESS ) //(mk): Check for start in rest when joining mid game. 
+			{
+				thread
+				(
+					void function() : ( player )
+					{
+						if( !IsValid( player ) )
+							return
+							
+						player.EndSignal( "OnDestroy" )
+						//player.WaitSignal( "SettingsReceieved" )
+						waitthread WaitSignalOrTimeout( player, 15, "SettingsReceieved" )//(mk): to prevent potential leak in the event client commands are disabled or throttled
+					
+						if ( player.p.start_in_rest_setting && !Gamemode1v1_IsPlayerInState( player, e1v1State.RESTING ) )
+							Gamemode1v1_ForceRest( player )
+					}
+				)()
 			}
 		}
 	)
@@ -750,6 +769,8 @@ bool function CC_1v1_MaxIBMMTime( entity player, array<string> args )
 		return false
 
 	player.p.IBMM_grace_period = NormalizeGracePeriod( Clamp( args[0].tofloat(), 0.0, 30.0 ) )
+	player.Signal( "SettingsReceieved" )
+	
 	return true
 }
 
@@ -1002,10 +1023,10 @@ void function Gamemode1v1_SetPlayerGamestate( entity player, int state = 0 )
 	
 	// if( player.GetPlayerNetInt( "FS_1v1_PlayerState" ) != state )
 	// {
-		#if DEVELOPER
-		if( player == gp()[0] )
-			printw( "[SERVER] SERVER PLAYER STATE CHANGED TO:", DEV_GetEnumStringSafe( "e1v1State", state ), player )
-		#endif
+		// #if DEVELOPER
+		// if( player == gp()[0] )
+			// printw( "[SERVER] SERVER PLAYER STATE CHANGED TO:", DEV_GetEnumStringSafe( "e1v1State", state ), player )
+		// #endif
 		
 		player.SetPlayerNetInt( "FS_1v1_PlayerState", state )
 		
@@ -2067,7 +2088,7 @@ bool function ClientCommand_mkos_challenge(entity player, array<string> args)
 			if( param2 != "" )
 			{
 				if( IsStringNumeric( param2 ) )
-					index = CharacterGuidRefToIndex( param2 )
+					index = CharacterGuidRefToIndex( param2 ) // could use GetItemFlavorByGUID( ConvertItemFlavorGUIDStringToGUID( "" ) ), client needs to send SAID.
 			}
 			
 			if( index >= indexMapLen || index < 0 )
@@ -2657,41 +2678,53 @@ void function sendGroupRecapsToPlayers( soloGroupStruct group )
 	int winnerKills = 0
 	int defeatedDeaths = 0
 	bool tied = false
+	bool bPlayer1IsWinner = false
 	
-	#if TRACKER
-		if( settings.bChalServerMsg )
+	if( settings.bChalServerMsg )
+	{
+		if( player1.kills > player2.kills )
 		{
-			if( player1.kills > player2.kills )
-			{
-				winnerName = group.player1.p.name 
-				winnerKills = player1.kills
-				defeatedName = group.player2.p.name 
-				defeatedDeaths = player2.kills
-			}
-			else if ( player2.kills > player1.kills )
-			{
-				winnerName = group.player2.p.name 
-				winnerKills = player2.kills
-				defeatedName = group.player1.p.name 
-				defeatedDeaths = player1.kills
-			}
-			else if ( player1.kills == player2.kills )
-			{
-				tied = true
-				winnerName = group.player1.p.name
-				winnerKills = player1.kills
-				defeatedName = group.player2.p.name 
-				defeatedDeaths = player2.kills
-			}
-			
-			if ( tied )
-				serverMsg = winnerName + " tied in a challenge vs " + defeatedName
-			else 
-				serverMsg = format(" %s won a challenge vs %s,  %d - %d", winnerName, defeatedName, winnerKills, defeatedDeaths )
-			
-			SendServerMessage( serverMsg + Chat_GetAllEffects()[ "SKULL" ] )
+			bPlayer1IsWinner = true
+			winnerName = group.player1.p.name 
+			winnerKills = player1.kills
+			defeatedName = group.player2.p.name 
+			defeatedDeaths = player2.kills
 		}
-	#endif
+		else if ( player2.kills > player1.kills )
+		{
+			bPlayer1IsWinner = false
+			winnerName = group.player2.p.name 
+			winnerKills = player2.kills
+			defeatedName = group.player1.p.name 
+			defeatedDeaths = player1.kills
+		}
+		else if ( player1.kills == player2.kills )
+		{
+			tied = true
+			winnerName = group.player1.p.name
+			defeatedName = group.player2.p.name 
+		}
+		
+		if ( tied )
+			serverMsg = winnerName + " tied in a challenge vs " + defeatedName
+		else
+		{
+			groupStats stats = bPlayer1IsWinner ? player1 : player2
+			float winnerAccuracy
+			
+			if ( stats.shots > 0.0 ) 
+			{
+				winnerAccuracy = ( stats.hits.tofloat() / stats.shots.tofloat() ) * 100.0
+				
+				if ( winnerAccuracy > 100.0 ) 
+					winnerAccuracy = 100.0
+			}
+			
+			serverMsg = format(" %s won a challenge vs %s,  %d - %d; Accuracy: %.1f%%", winnerName, defeatedName, winnerKills, defeatedDeaths, winnerAccuracy )
+		}
+		
+		SendServerMessage( serverMsg + Chat_GetAllEffects()[ "SKULL" ] )
+	}
 	
 	groupRecapStats( group.player1, player1.damage, player1.hits, player1.shots, player1.kills, player1.deaths, player2.displayname, player2.damage, player2.hits, player2.shots, player2.kills, player2.deaths, group.startTime ) 
 	groupRecapStats( group.player2, player2.damage, player2.hits, player2.shots, player2.kills, player2.deaths, player1.displayname, player1.damage, player1.hits, player1.shots, player1.kills, player1.deaths, group.startTime ) 
@@ -3449,7 +3482,8 @@ void function Gamemode1v1_TeleportPlayer( entity player, LocPair data )
 	player.SetVelocity( Vector( 0,0,0 ) )
 	
 	player.SetOrigin( data.origin )
-	player.SetAngles( data.angles )
+	//player.SetAngles( data.angles )
+	player.SetAbsAngles( data.angles )
 	
 	player.SnapEyeAngles( data.angles )
 	player.SnapFeetToEyes()
@@ -3983,6 +4017,7 @@ void function FS_1v1_MainLoop_THREAD( LocPair waitingRoomLocation )
 			
 			//IF IT'S NOT IN RESTING LIST, WAITING LIST OR IN SOLO MODE MEANS PLAYER JUST CONNECTED
 			//(cafe) This should be using OnPlayerConnected callback or something, but we need to make sure there is time for player to send start_in_rest_setting setting via client command so this way may ensure the required time for that
+			//(mk): Done, however leaving this here for now, and it should be removed when possible. This method below never worked for players who joined mid-game
 			if( !Gamemode1v1_IsPlayerResting( player ) && !Gamemode1v1_IsPlayerWaiting( player ) && GetTDMState() == eTDMState.IN_PROGRESS )
 			{
 				if( !player.p.start_in_rest_setting )
@@ -5153,6 +5188,11 @@ void function Init_IBMM( entity player )
 
 void function Thread_CheckInput( entity player )
 {
+	if( !IsValid( player ) )
+		return
+		
+	player.EndSignal( "OnDestroy", "OnDisconnected" )
+
 	int timesCheckedForNewInput = 0
 	int previousInput = -1
 	bool isCheckerRunning
@@ -5160,9 +5200,6 @@ void function Thread_CheckInput( entity player )
     for( ; ; )
 	{
 		wait 0.1 //was 0.1
-		
-		if( !IsValid( player ) )
-			break
 
 		int typeOfInput = GetInput( player )
 		

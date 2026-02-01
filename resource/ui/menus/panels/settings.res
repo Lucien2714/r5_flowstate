@@ -239,8 +239,8 @@
         {
             ControlName				CNestedPanel
             InheritProperties       SettingsContentPanel
-            tall                    1351 [$WINDOWS]
-            tall                    1286 [$GAMECONSOLE]
+            tall                    1411 [$WINDOWS] //(mk): each switch button is 60 units tall, increase these when adding settings buttons.
+            tall                    1346 [$GAMECONSOLE] //(mk): you can find inherited properties in \platform\resource\basemodui_scheme.res
 
             tabPosition             1
 

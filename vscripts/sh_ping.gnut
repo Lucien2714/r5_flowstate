@@ -259,7 +259,7 @@ struct
 struct
 {
 	table< entity, table<int, float> >    nextPingTypeTimes
-	bool functionref( entity ) canPingFuncCallback
+	bool functionref( entity ) canPingFuncCallback = null
 	int myint
 
 } file
@@ -370,7 +370,9 @@ void function ShPing_Init()
 		AddCallback_OnCommsMenuStateChanged( OnCommsMenuChanged )
 		AddCallback_OnPlayerLifeStateChanged( OnLifeStateChanged )
 	#elseif SERVER
-		file.canPingFuncCallback = NULL_CAN_PING_CALLBACK
+		if( file.canPingFuncCallback == null )
+			file.canPingFuncCallback = NULL_CAN_PING_CALLBACK
+			
 		AddCallback_OnPlayerMatchStateChanged( OnPlayerMatchStateChanged )
 		AddCallback_OnClientConnected( OnPlayerConnected )
 
@@ -3248,15 +3250,18 @@ bool function CanPlayerPingDebounce( entity player, int pingType )
 	// If you try to spam it, it will block future pings until you pause for 0.3.
 	// forcing you to wait longer feels like it stopped working.
 
+	if( !file.canPingFuncCallback( player ) )
+		return false
+
 	float lastPingTime = file.nextPingTypeTimes[player][pingType]
 
 	if ( Time() - lastPingTime < 0.5 )
 	{
-		file.nextPingTypeTimes[player][pingType] = Time() - 0.2;
+		file.nextPingTypeTimes[player][pingType] = Time() - 0.2
 		return false
 	}
 
-	file.nextPingTypeTimes[player][pingType] = Time();
+	file.nextPingTypeTimes[player][pingType] = Time()
 	return true
 }
 

@@ -129,6 +129,7 @@ global enum ePlaylists
 	fs_knockbackknockout, //50
 	fs_onlyup, //51
 	fs_nextbots, //52
+	fs_grapples_n_guns, //53
 	
 	_PLAYLISTS_COUNT //LAST
 }
@@ -510,7 +511,9 @@ void function PassivesAllowed_Init()
 		ePlaylists.winterexpress,
 		ePlaylists.survival_solos,
 		ePlaylists.survival_duos,
-		ePlaylists.survival
+		ePlaylists.survival,
+		ePlaylists.fs_rankupmapmovementpractice,
+		ePlaylists.fs_realistic_ttv
 	]
 
 	bool result = ( allowedPassiveGamemodes.contains( Gamemode() ) && allowedPassivePlaylists.contains( Playlist() ) )
@@ -544,7 +547,7 @@ void function TrackerSupportedMode_Init()
 		ePlaylists.fs_dm,
 		ePlaylists.fs_tdm,
 		ePlaylists.fs_vamp_1v1,
-		//ePlaylists.fs_lgduels_1v1,
+		ePlaylists.fs_lgduels_1v1,
 		ePlaylists.fs_scenarios,
 		ePlaylists.survival,
 		ePlaylists.SURVIVAL,
@@ -674,8 +677,8 @@ void function RagdollsDisabled_Init()
 bool function Flowstate_PassivesAllowedForMode()
 {
 	#if !UI
-	if( !Flowstate_GivePassive() )
-		return false
+		if( !Flowstate_GivePassive() )
+			return false
 	#endif
 	
 	#if DEVELOPER && PRINT_GAMEMODE_DEBUGS

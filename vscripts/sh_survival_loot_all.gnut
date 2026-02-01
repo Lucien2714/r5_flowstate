@@ -193,6 +193,23 @@ global struct OverrideDeathBoxRUI_NetworkOptimizedStruct
 #endif
 
 
+struct CustomWeaponData
+{
+	string className,
+	int tier,
+	array<string> baseMods,
+	array<string> supportedAttachments,
+	string pickupSound1p,
+	string pickupSound3p,
+	string weaponType,
+	float lowWeaponChance,
+	float medWeaponChance,
+	float highWeaponChance,
+	string hudIcon,
+	string name,
+	bool isCP
+}
+
 struct
 {
 	table< string, LootData > lootData
@@ -219,7 +236,9 @@ struct
 		int                                                       profilesSent = 0
 	#endif
 	
+	array< CustomWeaponData > registeredScriptedWeapons
 	bool ENABLE_DEFINED_SETS
+	
 } file
 
 
@@ -300,6 +319,7 @@ void function SURVIVAL_Loot_All_InitShared()
 			SURVIVAL_Loot_RegFromDataTable( GetDataTable( $"datatable/flowstate_all_new_snd.rpak" ) )
 		
 		RegisterCustomWeapons()
+		RegisterWeaponsFromScripts()
 	}
 
 	#if(UI)
@@ -638,21 +658,54 @@ void function SURVIVAL_Loot_RegFromDataTable(var dt)
 	#endif
 }
 
-struct CustomWeaponData
+void function RegisterScriptedWeapon( string className, string weaponType = "assault", string name = "Custom Weapon", int tier = 1, array< string > baseMods = [], array< string > supportedAttachments = [], string pickupSound1p = "survival_loot_pickup_weapon_rspn101", string pickupSound3p = "survival_loot_pickup_3p_weapon_rspn101", float lowWeaponChance = 0.0, float medWeaponChance = 0.0, float highWeaponChance = 0.0, string hudIcon = "$\"\"", bool isCP = false )
 {
-	string className,
-	int tier,
-	array<string> baseMods,
-	array<string> supportedAttachments,
-	string pickupSound1p,
-	string pickupSound3p,
-	string weaponType,
-	float lowWeaponChance,
-	float medWeaponChance,
-	float highWeaponChance,
-	string hudIcon,
-	string name,
-	bool isCP
+	foreach( CustomWeaponData d in file.registeredScriptedWeapons )
+	{
+		if( d.className == className )
+			mAssert( 0, "Weapon \"%s\" already exists in file.registeredScriptedWeapons", className )
+	}
+	
+	CustomWeaponData data 
+	
+	data.className = className
+	data.tier = tier 
+	data.baseMods = baseMods
+	data.supportedAttachments = supportedAttachments
+	data.pickupSound1p = pickupSound1p
+	data.pickupSound3p = pickupSound3p
+	data.weaponType = weaponType
+	data.lowWeaponChance = lowWeaponChance
+	data.medWeaponChance = medWeaponChance
+	data.highWeaponChance = highWeaponChance
+	data.hudIcon = hudIcon
+	data.name = name
+	data.isCP = isCP
+
+	file.registeredScriptedWeapons.append( data )
+}
+
+void function RegisterWeaponsFromScripts() //(mk): These should always be moved to rpak at earliest convenience. Do not let this list go unmaintained!
+{
+	if( Playlist() == ePlaylists.fs_grapples_n_guns )
+	{
+		RegisterScriptedWeapon
+		( 
+			"mp_weapon_sentinel_grapples",
+			"sniper"
+		)
+		
+		RegisterScriptedWeapon
+		(
+			"mp_ability_grapple_grapples",
+			"ability"
+		)
+	}
+	
+	foreach( CustomWeaponData data in file.registeredScriptedWeapons )
+		RegisterWeapon( data, true )
+		
+	file.registeredScriptedWeapons.resize( 0 )
 }
 
 void function RegisterCustomWeapons()
@@ -918,7 +971,7 @@ bool function ClientCallback_SetNextCustomConsumable( entity player, array<strin
 }
 #endif
 
-void function RegisterWeapon( CustomWeaponData weaponData )
+void function RegisterWeapon( CustomWeaponData weaponData, bool bHasDamageDef = false )
 {
 	LootData data
 	
@@ -931,12 +984,17 @@ void function RegisterWeapon( CustomWeaponData weaponData )
 	// Attacker [Killed] Victim.
 	// This would be nice if changed, but it's good as is for now,
 	// as the game is not fully functioning yet.
-	//RegisterWeaponForUse( data.baseWeapon )
+	// RegisterWeaponForUse( data.baseWeapon )
 
 	// precache the weapon, obviously.
 	#if !UI
-		PrecacheWeapon(weaponData.className)
-		RegisterCustomWeaponDamageDef( weaponData.className, weaponData.name, weaponData.hudIcon ) //~mkos
+		PrecacheWeapon( weaponData.className )
+		
+		if( bHasDamageDef )
+			RegisterWeaponDamageSource( weaponData.className )
+		else
+			RegisterCustomWeaponDamageDef( weaponData.className, weaponData.name, weaponData.hudIcon ) //~mkos
+		
 		//RegisterCustomWeaponDamageSource(weaponData.className)
 	#endif
 	// rarity

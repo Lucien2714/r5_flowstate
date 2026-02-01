@@ -265,7 +265,18 @@ void function PlaylistOverrideInit()
 	string playlistOverride = Dev_CommandLineParmValue( "playlistOverride" )
 		
 	if( playlistOverride != "" )
+	{
+		array< string > allPlaylists = GetAllPlaylists()
+		
+		if( !allPlaylists.contains( playlistOverride ) )
+		{
+			Warning( "Tried to load playlist '%s' but it does not exist in the playlist file.", playlistOverride )
+			return
+		}
+		
 		SetCurrentPlaylist( playlistOverride )
+		Dev_CommandLineRemoveParm( "playlistOverride" ) //(mk): cleanup override.
+	}
 }
 
 void function PrecacheFSEntities()

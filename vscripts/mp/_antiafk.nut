@@ -35,19 +35,18 @@ void function Flowstate_InitAFKThreadForPlayer( entity player )
 		//return
 	#endif
 
-	if
-	( 
-		!IsValid( player ) || 
-		 IsAdmin( player ) || 
-		 !file.flowstate_afk_kick_enable || 
-		 !file.enable_afk_thread 
-	)
-	return
-
+	if( !IsValid( player ) )
+		return 
+		
+	//(mk): these are needed for game logic that utilizs p.lastmoved 
 	AfkThread_AddPlayerCallbacks( player ) //readded mkos
-	//player.SetSendInputCallbacks( true ) //disabled internal call
 	AfkThread_PlayerMoved( player )
-	thread CheckAfkKickThread(player)
+
+	if( !file.flowstate_afk_kick_enable || !file.enable_afk_thread ) // IsAdmin( player ) //(mk): removed admin check here so admins can still be afked-to-rest
+		return
+
+	//player.SetSendInputCallbacks( true ) //disabled internal call
+	thread CheckAfkKickThread( player )
 }
 
 int function GetAfkState( entity player )
@@ -133,9 +132,10 @@ void function CheckAfkKickThread(entity player)
 						mAssert( false, "Playlist has afk_to_rest enabled, but mode has rest disabled internally. Try using Gamemode1v1_SetRestEnabled()" )
 						//(mk): We WANT to assert here, because otherwise, this condition will always run with no effect. 
 				}
-				else 
+				else
 				{	
-					KickPlayerById( player.GetPlatformUID(), "You were AFK for too long" )		
+					if( !IsAdmin( player ) )
+						KickPlayerById( player.GetPlatformUID(), "You were AFK for too long" )
 				}
 				break
 				

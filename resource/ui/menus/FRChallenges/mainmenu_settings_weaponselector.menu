@@ -304,6 +304,39 @@ scripts/resource/ui/menus/FRChallenges/mainmenu_settings_weaponselector.menu
 			pin_corner_to_sibling   RIGHT
 			pin_to_sibling_corner   RIGHT
 		}
+		
+		ResetSelectedWeapons 
+		{
+			//(mk): non aimtrainer mode only
+			
+			"ControlName" 			"RuiButton"
+			InheritProperties		TabButton
+			wide					200
+			tall					40
+		    visible					"1"
+			sound_focus           	"UI_Menu_Focus"
+			sound_accept          	"UI_Menu_Accept"
+			cursorPriority        	"-1"	
+			
+			ruiArgs
+			{
+				isSelected 0
+				buttonText 			"RESET"
+				basicImageColor     "255 255 255"
+                basicImageAlpha     1
+			}
+			
+			
+			xpos                    330
+			ypos                    0
+			zpos                    15
+            visible 1
+
+			pin_to_sibling          SelectSecondaryWeapon
+			pin_corner_to_sibling   RIGHT
+			pin_to_sibling_corner   RIGHT
+		}
+		
 		BuyAttachmentsHint
 		{
 			ControlName				Label

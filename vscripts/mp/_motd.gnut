@@ -7,9 +7,14 @@ void function FireRemoteMotd( entity player )
 		void function() : ( player )
 		{
 			if ( !player.p.isConnected )
-				waitthread WaitSignalOrTimeout( player, 20, "OnConnected", "OnDestroy", "OnDisconnected" )
+				waitthread WaitSignalOrTimeout( player, 20, "OnConnected", "OnDestroy" )
 			
-			if ( IsValid( player ) && player.p.isConnected )
+			//(mk): Decided against late display, commenting the below.
+			
+			// WaitForGameState( eGameState.Playing )
+			// WaitForChampionToFinish()
+			
+			if ( IsValid( player ) && player.p.isConnected )		
 				Remote_CallFunction_UI( player, "UI_Callback_MOTD" )
 		}
 	)()
@@ -19,7 +24,10 @@ void function MOTD_Init()
 {
     if ( GetCurrentPlaylistVarBool( "enable_motd", false ) )
     {
-        printl("AddCallback_OnClientConnected( FireRemoteMotd )")
+		#if DEVELOPER
+			printl( "AddCallback_OnClientConnected( FireRemoteMotd )" )
+		#endif
+		
         AddCallback_OnClientConnected( FireRemoteMotd )
     }
 }

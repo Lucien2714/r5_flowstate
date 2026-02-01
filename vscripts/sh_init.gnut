@@ -17,6 +17,10 @@ void function SV_CL_Shared_Init()
 		Shared_Lobby_Init()
 		return
 	}
+	
+	#if SERVER || UI
+		UIVars_Init()
+	#endif 
 
 	SV_CL_Init()
 
@@ -291,7 +295,7 @@ void function Server_Init()
 	Utility_Init()
 	Anim_Init()
 	Viewcone_Init()
-	UIVars_Init()
+	//UIVars_Init() (mk): must be loaded early
 	TitanTransfer_Init()
 	TitanNPC_Init()
 	TitanNpcBehavior_Init()

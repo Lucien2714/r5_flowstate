@@ -1300,7 +1300,9 @@ vector function PhaseTunnel_GetPointOnRectangularPlane( vector origin, vector pl
 void function PhaseTunnel_PhaseEntity( entity ent, entity tunnelEnt, PhaseTunnelData tunnelData, PhaseTunnelPortalData portalData, PhaseTunnelTravelState travelState )
 {
 	//todo-iholstead: remove me once R5DEV-578675 is closed
-	printf("PhaseTunnel_PhaseEntity called on "+ ent + " for portal " + portalData.portalFX )
+	#if DEVELOPER
+		printf("PhaseTunnel_PhaseEntity called on "+ ent + " for portal " + portalData.portalFX )
+	#endif
 
 	Assert ( IsNewThread(), "Must be threaded off." )
 	ent.EndSignal( "OnDeath" )

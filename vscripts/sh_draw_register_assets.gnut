@@ -22,6 +22,13 @@ const MAX_WAIT_FOR_RPAK_TRANSFER = 5
 const RPAK_MP_TEMP_PATH = ""
 const bool DEBUG_REGISTER_ASSETS = false
 
+struct AssetData 
+{
+	string assetRef
+	string assetName
+	string category
+}
+
 struct
 {
 	//these must exist on client. Populated by playlists specified assets temporarily until a new transfer method is provided.
@@ -32,18 +39,61 @@ struct
 	#endif
 	
 	#if CLIENT
-		bool bShouldWaitForRpak = false
-		string someRpakName = ""
-		array<string> someBuiltAssetArrayFromServerClientMightNotHave = []
+		bool bShouldWaitForRpak
+		string someRpakName
+		array<string> someBuiltAssetArrayFromServerClientMightNotHave
 		array<int> invalidVideoAssets
-		bool videoValidationComplete = false
+		bool videoValidationComplete
 	#endif
 	
 	table<string, array<string> > categoryAssetArrays
 	table<string,string> assetLookupTable 
-	table<string,string> reverseAssetLookupTable = {}
+	table<string,string> reverseAssetLookupTable
+
+	array< AssetData > scriptRegisteredAssets
 
 } file
+
+void function RegisterHardcodedScriptAssets() //(mk): these should always be moved to an rpak when time permits.
+{
+	if( Playlist() == ePlaylists.fs_grapples_n_guns )
+	{
+		string grapplesCate = "grapples_n_guns" //Todo: Move this data to mod "grapples_n_guns" rpak
+		
+		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_cash.bik", grapplesCate, "cash" )
+		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_coin.bik", grapplesCate, "coin" )
+		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_meow.bik", grapplesCate, "meow" )
+		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_uwu.bik", grapplesCate, "uwu" )
+		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_hs_terminated.bik", grapplesCate, "terminated" )
+		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_intro1.bik", grapplesCate, "intro1" )
+		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_intro2.bik", grapplesCate, "intro2" )
+		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_intro3.bik", grapplesCate, "intro3" )
+		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_outro1.bik", grapplesCate, "outro1" )
+		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_outro2.bik", grapplesCate, "outro2" )
+		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_outro3.bik", grapplesCate, "outro3" )
+	}
+	
+	//more...
+}
+
+void function RegisterScriptAsset( string assetRef, string category, string assetName )
+{
+	foreach( AssetData data in file.scriptRegisteredAssets )
+	{
+		if( data.assetRef == assetRef )
+			mAssert( 0, "Asset \"%s\" already exists in file.scriptRegisteredAssets", assetRef )
+	}
+	
+	StringReplace( assetRef, "\\", "/" ) //just in case someone registers them wrong
+
+	AssetData data
+	
+	data.assetRef = assetRef
+	data.assetName = assetName
+	data.category = category
+	
+	file.scriptRegisteredAssets.append( data )
+}
 
 void function WorldDrawAsset_RegisterAllAssets()
 {
@@ -70,9 +120,9 @@ void function WorldDrawAsset_RegisterAllAssets()
 					WaitFrame()
 			#endif 
 		
-			if( IsFlowstateActive() )
+			if( IsFlowstateActive() ) //todo:callback for registering assets from rpak given an rpak name.. 
 			{
-				var audioTbl 		= GetDataTable( AUDIO_DATA_TABLE )
+				var audioTbl 		= GetDataTable( AUDIO_DATA_TABLE ) 
 				
 				int audioCount 		= GetDatatableRowCount( audioTbl )
 				int pathCol 		= GetDataTableColumnByName( audioTbl, "path" )
@@ -92,7 +142,7 @@ void function WorldDrawAsset_RegisterAllAssets()
 						print_data += "\"" + bikAssetRef + "\"\n"
 					#endif
 					
-					SortAsset( category, bikAssetRef )			
+					SortBikAsset( category, bikAssetRef )			
 					file.assets.append( bikAssetRef )
 					
 					WorldDrawAsset_AddToAssetTable( bikAssetName, bikAssetRef )
@@ -108,6 +158,16 @@ void function WorldDrawAsset_RegisterAllAssets()
 				
 				foreach( assetString in assets )
 					WorldDrawAsset_AddToAssetTable( assetString, assetString, true )
+			}
+			
+			RegisterHardcodedScriptAssets()
+			foreach( AssetData data in file.scriptRegisteredAssets )
+			{		
+				if( data.assetRef.find( ".bik" ) != -1 )
+					SortBikAsset( data.category, data.assetRef )	
+					
+				file.assets.append( data.assetRef )	
+				WorldDrawAsset_AddToAssetTable( data.assetName, data.assetRef, true )
 			}
 		}
 		catch( e )
@@ -338,7 +398,7 @@ void function WorldDrawAsset_RegisterAllAssets()
 	//There really is no other way to validate if a video exists on the client. Sorry.
 	void function CheckVideoAssets_expensive( entity player, array<int> videoAssetIds )
 	{
-		return
+		return //Currently nuked
 		
 		if( !IsValid( player ) ) //check again, was threaded off.
 			return
@@ -447,7 +507,7 @@ void function WorldDrawAsset_RegisterAllAssets()
 #endif
 
 #if SERVER || CLIENT 
-	void function SortAsset( string category, string bikAssetRef )
+	void function SortBikAsset( string category, string bikAssetRef )
 	{
 		if( empty( bikAssetRef ) )
 			return

@@ -89,6 +89,7 @@ struct
 	bool bCanPlayerPing
 }file
 
+
 void function rankupmap_init()
 {
 	AddCallback_OnClientConnected( rankupmap_player_setup )
@@ -96,6 +97,7 @@ void function rankupmap_init()
 	AddClientCommandCallback("tp", tp_to_cp)
 	AddClientCommandCallback("pm", practice_mode)	  
 	AddClientCommandCallback("hub", hub_command)
+	
 	rankupmap_precache()
 	
 	file.bCanPlayerPing = GetCurrentPlaylistVarBool( "player_can_ping", true )
@@ -112,11 +114,11 @@ void function rankupmapEntitiesDidLoad()
 	thread rankupmap_load()
 }
 
-void function rankupmap_player_setup(entity user) {
-  
-  file.is_practicing[user] <- false
-	file.current_cp[user] <- < 0, 0, 0 >
-	file.current_angles[user] <- < 0, 0, 0 > 
+void function rankupmap_player_setup( entity user ) 
+{
+	file.is_practicing[ user ] <- false
+	file.current_cp[ user ] <- < 0, 0, 0 >
+	file.current_angles[ user ] <- < 0, 0, 0 > 
 }
 
 // Practice mode
@@ -3293,7 +3295,7 @@ void function rankupmap_load() {
         if (ent.IsPlayer() && ent.GetPhysics() != MOVETYPE_NOCLIP) // Noclip players are not affected by the trigger
         {
         	array<ItemFlavor> characters = GetAllCharacters()
-        	CharacterSelect_AssignCharacter(ToEHI(ent), characters[10])
+        	CharacterSelect_AssignCharacter(ToEHI(ent), characters[10], true, false)
           ent.TakeOffhandWeapon(OFFHAND_ULTIMATE)
           Inventory_SetPlayerEquipment(ent, "", "armor")
 	        Inventory_SetPlayerEquipment(ent, "", "helmet")
@@ -3389,7 +3391,7 @@ thread function() : ( ent ) {
         	ent.SetAngles(<3,90,-0.04>)
         	ent.KnockBack(<0, 0, 0.1>, 0.1 )
         	array<ItemFlavor> characters = GetAllCharacters()
-        	CharacterSelect_AssignCharacter(ToEHI(ent), characters[1])
+        	CharacterSelect_AssignCharacter(ToEHI(ent), characters[1], true, false)
         	ent.SetPersistentVar("gen", 0)
         }
     }

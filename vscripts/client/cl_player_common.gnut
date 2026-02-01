@@ -28,6 +28,13 @@ global const string HITBEEP_HEADSHOT_KILL_ANDROID   = "Player.Hitbeep_headshot.K
 global const string HITBEEP_RAPID_HEADSHOT_HUMAN    = "player_hitbeep_headshotrapid_human_1p_vs_3p"
 global const string HITBEEP_RAPID_HEADSHOT_ANDROID  = "Player.Hitbeep_headshot.Android_1P_vs_3P"
 
+struct
+{
+	bool bEnableHeadshotSounds
+	bool bEnableKillshotSounds
+
+} file 
+
 void function ClPlayer_Common_Precache()
 {
 	PrecacheParticleSystem( SPRINT_FP )
@@ -59,12 +66,18 @@ void function ClPlayer_Common_Precache()
 		PrecacheParticleSystem( FX_BLOODSPRAY_DECAL_MED )
 		PrecacheParticleSystem( FX_BLOODSPRAY_DECAL_LRG )	
 	}
+	
+	file.bEnableHeadshotSounds = GetCurrentPlaylistVarBool( "enable_headshot_sounds", true )
+	file.bEnableKillshotSounds = GetCurrentPlaylistVarBool( "enable_killshot_sounds", true )
 }
 
 bool function PlayHeadshotConfirmSound( entity attacker, entity victim, entity weapon, bool isKillShot )
 {
 	if ( victim.IsTitan() )
 		return false
+
+	if( !file.bEnableHeadshotSounds )
+		return true
 
 	bool isAndroid = ((IsAndroidNPC( victim ) || victim.IsMechanical()) && !IsFiringRangeGameMode())
 
@@ -99,6 +112,9 @@ bool function PlayKillshotConfirmSound( entity attacker, entity victim, int dama
 {
 	if ( victim.IsTitan() )
 		return false
+
+	if( !file.bEnableKillshotSounds )
+		return true
 
 	//if ( !( "playedKillShotSoundTime" in victim.s ) )
 	//	victim.s.playedKillShotSoundTime <- -100

@@ -34,4 +34,4 @@ Reload:
 1. Reload notepad++
 
 Any .nut or .gnut files opened from this point forward will automatically apply the style.
-If you have already opened files, thy will not automaically apply, however, you can click "Language" -> "Squirrel" on the file to manually apply the opened file.
+If you have already opened files, they will not automaically apply, however, you can click "Language" -> "Squirrel" on the file to manually apply the opened file.

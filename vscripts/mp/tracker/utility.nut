@@ -99,22 +99,28 @@ struct
 	table< string, table< string, string > > tbl_adminConfirmations
 	table< string, int > tbl_weaponIdentifiers
 	array< string > adminsArray
+	
 	bool bStopUpdateMsg
 	bool bAutoRotationEnabled
-
+	bool bAllowLooseNameComp
+	
 } file
 
 void function TrackerUtilityInit()
 {
 	RegisterSignal( "ConfirmAction" )
 	
-	string autoRotateList = GetCurrentPlaylistVarString( "auto_rotate_list", "" )
-	if( autoRotateList != "" )
+	string autoRotateList 				= GetCurrentPlaylistVarString( "auto_rotate_list", "" )
+	bool autoRotateListForcedDisabled 	= Dev_CommandLineParmValue( "autoRotateForceDisable" ) == "true"
+	
+	if( autoRotateList != "" && !autoRotateListForcedDisabled )
 	{
 		file.bAutoRotationEnabled = true
 		AutoMapPlaylistGamemodeRotationInit( autoRotateList )
 		AddCallback_GameStateEnter( eGameState.Postmatch, DecideNextMapPlaylistGamemodeRotation )
 	}
+	
+	file.bAllowLooseNameComp = GetCurrentPlaylistVarBool( "enable_loose_playername_comparison", true )
 }
 	
 	//client command: show
@@ -463,12 +469,10 @@ void function TrackerUtilityInit()
 	//cc commands
 	bool function ClientCommand_mkos_admin( entity player, array<string> args )
 	{	
-		if ( !CheckRate( player, "admin_commands" ) ) 
-			return false
-		
 		string PlayerUID = player.GetPlatformUID()
-
-		if( !IsServerAdmin( PlayerUID ) )
+		bool bIsAdmin = IsServerAdmin( PlayerUID )
+		
+		if ( !bIsAdmin ) 
 			return false
 			
 		string command
@@ -500,23 +504,21 @@ void function TrackerUtilityInit()
 				[
 					"\n\n\n\n\n\n\n\n\n\n\n\n\n\nA command is entered as:\n\n cc command #param #param2 ...\n\n",
 					"cc afk [0|1|true|false]   - disabled or enables afk to rest mode\n",
-					"cc kick [name|oid]   - Kicks a player by name/oid\n",
-					"cc kicksay [name|oid] [reason]    - Kicks a player and announces the reason to the whole server.\n",
-					"cc timeout [name|oid] [true|false] [-r \"reason\"] [timestring]    - Times out the player\n",
+					"cc kick [name|oid] [-r \"reason\"] [-say]  - Kicks a player by name/oid, optionally add -say to announce\n",
+					"cc timeout [name|oid] [true|false] [-r \"reason\"] [timestring] [-say]   - Times out the player. Optionally add -say to announce\n",
 					"cc gettimeout [name|oid]    - Returns data about a timeout\n",
-					"cc mute/unmute [name|oid] [-r \"[reason]\"] [timestring]     - Mutes / unmutes\n", 
+					"cc mute/unmute [name|oid] [-r \"[reason]\"] [timestring] [-say]    - Mutes / unmutes\n", 
 					"cc msg [name|oid] \"message\"    - Sends a PM to a player. A way to communicate with other admins\n",
 					"cc sayto [name|oid] [title] [msg] [dur]    - Sends a titled message to a specific player (duration defaults to ~3s if omitted)\n"
-					"cc sayall '#title' '#message' #duration   - Broadcasts a titled message to all clients with a duration (seconds).\n",
+					"cc sayall [#title] [#message] [duration]   - Broadcasts a titled message to all clients with a duration (seconds).\n",
 					"cc adminmsg [name|oid] \"message\"    - Sends an admin-branded message to a specific player\n",
 					"cc adminmsgall \"message\"    - Sends an admin-branded message to all players.\n",
-					"cc bansay [name|oid] [reason]    - Bans a player and announces the reason to the whole server.\n",
-					"cc ban #name/oid #reason    - Bans a player\n",
-					"cc unban #oid   - attempts to unban a player by OID\n",
-					"cc map #name #playlist #gamemode   - reloads map. partials match i.e. \"cc map comp\" will load mp_rr_arena_composite\n", 
+					"cc ban [name/oid] [-r \"[reason]\"] [-say]   - Bans a player. Optionally add -say to announce\n",
+					"cc unban [oid]   - attempts to unban a player by OID\n",
+					"cc map [name] [playlist] [gamemode]   - reloads map. partials match i.e. \"cc map comp\" will load mp_rr_arena_composite\n", 
 					"cc endround    - forces the round timer to end now\n",
-					"cc playerinput #name/oid   - shows players input\n", 
-					"cc playerinfo  - some stats",
+					"cc playerinput [name/oid]   - shows players input\n", 
+					"cc playerinfo  - some debug stats",
 					"\n\n For more commands, see https://docs.r5r.dev"
 				]
 				
@@ -553,14 +555,15 @@ void function TrackerUtilityInit()
 				}
 				
 				int calc = param2.tointeger()
-				if( calc > 129 || calc < 0 )
+				if( ( calc > 129 || calc < 0 ) && calc != -1 )
 				{
-					Message( player, "Invalid team. Must be > 0 and < 129" )
+					Message( player, "Invalid team. Must be >= -1 and < 129" )
 					return true
 				}
 				
 				__ServerCommand( format( "sv_addbot %s %s", param, param2 ) )
 				Message( player, format( "Bot '%s' created on team '%s'", param, param2 ) )
+				
 				return true
 			}
 			case "kick":
@@ -573,41 +576,50 @@ void function TrackerUtilityInit()
 
 				try 
 				{		
-					entity k_player
-					string k_playeroid
-					string k_playername
-					string reason = param2
+					entity kickPlayer
+					string kickPlayerUid
+					string kickPlayerName
+					string reason = Chat_FindReasonInArgs( args )
 					
-					k_player = GetPlayer( param )
+					kickPlayer = GetPlayer( param )
 					
-					if ( !IsValid( k_player ) )
+					if ( !IsValid( kickPlayer ) )
 					{
 						Message( player, "Failed", format( "Player: '%s' is invalid. ", param ) )
 						return true
 					}
 					
-					if( k_player.IsBot() )
+					if( kickPlayer.IsBot() )
 					{
-						string botName = k_player.GetPlayerName()
+						string botName = kickPlayer.GetPlayerName()
 						__ServerCommand( format( "kick %s", botName ) )
 						
 						Message( player, format( "Bot player %s was kicked", botName ) )
 						return true
 					}
 						
-					k_playeroid = k_player.GetPlatformUID()	
-					k_playername = k_player.GetPlayerName()
+					kickPlayerUid = kickPlayer.GetPlatformUID()	
+					kickPlayerName = kickPlayer.GetPlayerName()
 					
-					if ( IsServerAdmin( k_playeroid ) )
+					if ( IsServerAdmin( kickPlayerUid ) )
 					{
 						Message( player, "Cannot kick admin")
 						return true
 					}
 				
-					KickPlayerById( k_playeroid, reason )
+					KickPlayerById( kickPlayerUid, reason )
 					UpdatePlayerCounts()
 					
-					Message( player, "Kicked player", format( "PUID: '%s'\nName: '%s'", k_playeroid, k_playername ) )
+					Message( player, "Kicked player", format( "PUID: '%s'\nName: '%s'", kickPlayerUid, kickPlayerName ) )
+					
+					if( args.contains( "-say" ) )
+					{
+						string msgHeader = format( "%s was kicked for: ", kickPlayerName )
+						BroadcastResponse( msgHeader + reason, true )
+						foreach( s_player in GetPlayerArray() )
+							Message( s_player, msgHeader, reason )
+					}
+					
 					return true	
 				}
 				catch ( erraaarg )
@@ -742,7 +754,7 @@ void function TrackerUtilityInit()
 					return true
 				} 
 				
-				foreach ( say_to_player in GetPlayerArray())
+				foreach ( say_to_player in GetPlayerArray() )
 				{
 					try	
 					{	
@@ -792,109 +804,56 @@ void function TrackerUtilityInit()
 				
 				try 
 				{
-					entity b_player
-					string b_playeroid
-					string b_reason = param2	
+					entity banPlayer
+					string banPlayerUID
+					string banPlayerName
+					string banReason = Chat_FindReasonInArgs( args )	
 					
-					b_player = GetPlayer( param )
+					banPlayer = GetPlayer( param )
 				
-					if ( !IsValid( b_player ) )
+					if ( !IsValid( banPlayer ) )
 					{
 						Message( player, "Failed", "Player: " + param + " - is invalid. " )
 						return true
 					}
 					
-					b_playeroid = b_player.GetPlatformUID()	
-						
+					banPlayerName = banPlayer.GetPlayerName()
+					banPlayerUID = banPlayer.GetPlatformUID()			
 					
-					if ( IsServerAdmin( b_playeroid ) )
+					if ( IsServerAdmin( banPlayerUID ) )
 					{
 						Message( player, "Cannot ban admin" )
 						return true
 					}
 				
 					#if HAS_TRACKER_DLL
-						BanPlayerById( b_playeroid, b_reason, player.GetPlatformUID() )
+						BanPlayerById( banPlayerUID, banReason, player.GetPlatformUID() )
 					#else
-						BanPlayerById( b_playeroid, b_reason )
+						BanPlayerById( banPlayerUID, banReason )
 					#endif
 					
 					UpdatePlayerCounts()
 					
-					Message( player, "Success", "Player: " + param + "\n\n was banned for: \n\n" + b_reason )
+					Message( player, "Success", format( "Player: %s\n\n was banned for: \n\n%s", banPlayerName, banReason ) )
+					
+					if( args.contains( "-say" ) )
+					{
+						string msgHeader = format( "%s was BANNED for: ", banPlayerName )
+						SendServerMessage( msgHeader + banReason )
+						foreach( s_player in GetPlayerArray() )
+							Message( s_player, msgHeader, banReason, 10.0 )
+					}
+					
 					return true		
 				} 
 				catch ( erre )
 				{
-					Message(player, "Failed", "Command failed because of: \n\n " + erre )
+					Message( player, "Failed", "Command failed because of: \n\n " + erre )
 					return true
 				}
 					
 				return true
 			}
-			case "bansay":
-			{
-				if ( args.len() < 2 )
-				{
-					Message( player, "Failed", "Command 'bansay' requires player for 1st param of command" )
-					return true
-				}
-				
-				args[0] = "ban"	
-				ResetRate( player )
-				entity target = GetPlayer( param )
-				
-				if( IsValid( target ) )
-				{
-					string targetName = target.GetPlayerName()
-					bool result = ClientCommand_mkos_admin( player, args )
-
-					if( result )
-					{
-						string msgHeader = format( "%s was BANNED for: ", targetName )
-						SendServerMessage( msgHeader + param2 )
-						foreach( s_player in GetPlayerArray() )
-							Message( s_player, msgHeader, param2, 10.0 )
-					}
-				}
-				else 
-				{
-					Message( player, "Invalid player: " + param )
-				}
-				break
-			}
-			case "kicksay":
-			{
-				if ( args.len() < 2 )
-				{
-					Message( player, "Failed", "Command 'kicksay' requires player for 1st param of command" )
-					return true
-				}
-				
-				args[ 0 ] = "kick"
-				ResetRate( player )
-				entity target = GetPlayer( param )
-				
-				if( IsValid( target ) )
-				{
-					string targetName = target.GetPlayerName()
-					bool result = ClientCommand_mkos_admin( player, args )
-
-					if( result )
-					{
-						string msgHeader = format( "%s was kicked for: ", targetName )
-						SendServerMessage( msgHeader + param2 )
-						foreach( s_player in GetPlayerArray() )
-							Message( s_player, msgHeader, param2 )
-					}
-				}
-				else 
-				{
-					Message( player, "Invalid player: " + param )
-				}
-				break
-			}
-			
 			case "banid":
 			{
 				#if HAS_TRACKER_DLL
@@ -918,23 +877,20 @@ void function TrackerUtilityInit()
 							return true	
 						}
 						
-						if ( param2 == "" )
-							param2 = "unknown reason"							
-						
+						string reason = Chat_FindReasonInArgs( args )
 						entity playerToBan = GetPlayerEntityByUID( param )
 						
 						if( IsValid( playerToBan ) )
 						{
-							BanPlayerById( param, param2, player.GetPlatformUID() )
+							BanPlayerById( param, reason, player.GetPlatformUID() )
 							Message( player, "Success", param + " was added to the banlist and removed from the server.", 10 )
 							return true
 						}
 							
-						Message( player, "Attempting banlist edit", format( "For user: [%s] with reason: \"%s\"", param, param2 ), 10 )
-						AddBanByID( param, param2, player.GetPlatformUID() )
+						Message( player, "Attempting banlist edit", format( "For user: [%s] with reason: \"%s\"", param, reason ), 10 )
+						AddBanByID( param, reason, player.GetPlatformUID() )
 						
-						return true	
-						
+						return true				
 					}
 					catch ( errbanid )
 					{
@@ -1134,12 +1090,14 @@ void function TrackerUtilityInit()
 					return true
 				}
 				
-				string playlist = FindPlaylistName( param2 )
+				string playlist = GetCurrentPlaylistName()
 				string errorMsg
 				bool bIsPlaylistValid
 						
 				if( param2 != "" )
 				{
+					playlist = FindPlaylistName( param2 )
+				
 					if( playlist == "" )
 						errorMsg = format( "Could not find a valid playlist via partial matching for criteria '%s'", playlist )
 				
@@ -1193,9 +1151,6 @@ void function TrackerUtilityInit()
 						sqerror( errorMsg )
 						return true
 					}
-					
-					if( bIsPlaylistValid )
-						Dev_CommandLineAddParm( "playlistOverride", playlist )
 				}
 					
 				if( !DoesPlaylistSupportGamemode( playlist, gamemode ) )
@@ -1207,7 +1162,10 @@ void function TrackerUtilityInit()
 					return true 
 				}
 				
-				printf( "Admin Changing to map: %s, Gamemode: %s, playlist: %s", map, gamemode, playlist != "" ? playlist : GetCurrentPlaylistName() )
+				if( bIsPlaylistValid )
+					Dev_CommandLineAddParm( "playlistOverride", playlist )
+				
+				printf( "Admin '%s' Changing to map: %s, Gamemode: %s, playlist: %s", player.GetPlatformUID(), map, gamemode, playlist != "" ? playlist : GetCurrentPlaylistName() )
 				GameRules_ChangeMap( map, gamemode )
 					
 				return true
@@ -1347,7 +1305,7 @@ void function TrackerUtilityInit()
 				
 				try 
 				{			
-					if ( !IsFloat( param2 ) )
+					if ( !IsStringFloat( param2 ) )
 					{
 						Message( player, "Failed", "param 3 of command 'scoreconfig' must be numeric type float, \n\n example: 0.8 --            '" + param2 + "' was provided" )
 						return true
@@ -1386,25 +1344,29 @@ void function TrackerUtilityInit()
 			{
 				#if TRACKER && HAS_TRACKER_DLL	
 					TrackerCleanupLogs__internal()
+					Message( player, "Success", "Internal logs cleanup process ran" )
+					return true
 				#endif
 						
-				return true
+				return false
 			}
 			case "reload_config":
 			{
 				#if TRACKER && HAS_TRACKER_DLL	
 					TrackerReloadConfig__internal()
+					Message( player, "Success", "r5rdev_config.json was reloaded" )
+					return true
 				#endif
 						
-				return true
-			}	
+				return false
+			}
 			case "setting":
 			{		
 				#if TRACKER && HAS_TRACKER_DLL	
 				
 					if ( args.len() < 2)
 					{
-						Message( player, "Failed", "Param 1 of command 'setting' requires key name")
+						Message( player, "Failed", "Param 1 of command 'setting' requires key name" )
 						return true
 					}				
 					
@@ -1425,7 +1387,7 @@ void function TrackerUtilityInit()
 				#endif
 						
 				break
-			}	
+			}
 			case "spamupdate":
 			case "spam":
 			{
@@ -1726,16 +1688,19 @@ void function TrackerUtilityInit()
 					else 
 						Message( player, "Error", format( "Player: %s was invalid", StringRemoveControlCharacters( param ) ), 7 )
 					
+					return true
 				#endif
 				
-				return true
+				return false
 			}	
 			case "testremote":
 			{
 				#if DEVELOPER
 					Remote_CallFunction_NonReplay( player, "ServerCallback_SetPersistenceSettings", 1, 2, 3, 4)
+					return true
 				#endif
-				return true
+				
+				return false
 			}	
 			case "acceptchal":
 			{
@@ -1749,16 +1714,14 @@ void function TrackerUtilityInit()
 					}
 					
 					DEV_acceptchal(p)
-				#else 
-					printt("Dev mode only")
+					return true
 				#endif 
 				
-				return true
+				return false
 			}	
 			case "draw":
 			{
-				#if DEVELOPER 
-				
+				#if DEVELOPER 			
 					printt("Drawing...")
 					foreach( s_player in GetPlayerArray() )
 					{
@@ -1766,24 +1729,22 @@ void function TrackerUtilityInit()
 						//Remote_CallFunction_NonReplay( s_player, "Minimap_EnableDraw_Internal")
 					}
 					
+					return true
 				#endif 
 				
-				return true 
+				return false 
 			}	
 			case "disabledraw":
 			{
-				#if DEVELOPER 
-				
-					printt("DisableDrawing...")
+				#if DEVELOPER 		
+					printt( "DisableDrawing..." )
 					foreach( s_player in GetPlayerArray() )
-					{
 						Remote_CallFunction_ByRef( s_player, "Minimap_DisableDraw_Internal" )
-						//Remote_CallFunction_NonReplay( s_player, "Minimap_DisableDraw_Internal")
-					}
-					
+						
+					return true 
 				#endif 
 				
-				return true 
+				return false 
 			}		
 #if DEVELOPER			
 			case "stoplog":
@@ -1832,8 +1793,10 @@ void function TrackerUtilityInit()
 			case "mute":
 			case "gag":
 			{	
-				entity p = GetPlayer( param )				
-				if( !IsValid( p ) )
+				entity mutePlayer = GetPlayer( param )				
+				string reason = Chat_FindReasonInArgs( args )
+				
+				if( !IsValid( mutePlayer ) )
 				{
 					if( !IsStringNumber( param ) )
 					{
@@ -1847,18 +1810,29 @@ void function TrackerUtilityInit()
 				}
 				else 
 				{
-					string reason = Chat_FindReasonInArgs( args )
-					LocalMsg( p, "#FS_MUTED", "", eMsgUI.DEFAULT, 5, "", reason )
+					LocalMsg( mutePlayer, "#FS_MUTED", "", eMsgUI.DEFAULT, 5, "", reason )
 				}
 					
 				#if TRACKER
 					Tracker_SetForceUpdatePlayerData() //does nothing if already set.
 				#endif
 				
-				if( !Chat_ToggleMuteForAll( p, true, true, args, -1, param, player ) )
+				if( !Chat_ToggleMuteForAll( mutePlayer, true, true, args, -1, param, player ) )
 					Message( player, "Failed" )
 				else
 					Message( player, "Muted " + param )
+					
+				if( args.contains( "-say" ) )
+				{
+					string muteMessage = format( "%s was muted for %s", mutePlayer.GetPlayerName(), reason )
+					foreach( s_player in GetPlayerArray() )
+					{
+						if( s_player == mutePlayer )
+							continue
+							
+						SendResponse( s_player, muteMessage )
+					}
+				}
 				
 				return true
 			}
@@ -1973,7 +1947,7 @@ void function TrackerUtilityInit()
 				string timestring 		= "0"
 				
 				if( IsStringNumeric( unmuteTimestamp ) )
-					timestring = Chat_ReadableTime( unmuteTimestamp.tointeger() )
+					timestring = Chat_ReadableExpiresTime( unmuteTimestamp.tointeger() )
 				
 				Message( player, "UNMUTE TIME: " + unmuteTimestamp, timestring )
 				return true
@@ -2118,7 +2092,10 @@ void function TrackerUtilityInit()
 			case "restart_ws":
 			{
 				#if TRACKER 
-					TrackerRestartWebsocket__internal() //useful if websocket server goes down for some reason and admin wants to manually reset connection from cc
+					TrackerRestartWebsocket__internal() //useful if websocket server goes down for some reason and admin wants to manually reset connection from cc		
+					Message( player, "Success", "Restarting websocket connection to r5r.dev" )
+				#else
+					return false
 				#endif 
 				
 				break
@@ -2140,7 +2117,7 @@ void function TrackerUtilityInit()
 				
 				if( param2 == "" )
 				{
-					Message( player, "Error:", "Cmd timeout requires param 2 of bool: [true/false] timeout/untimeout" )
+					Message( player, "Error: Cmd timeout requires param 2 of bool", "Should be replaced after the player name. Example: cc timeout [playername] true/false -r \"Bad boy\" 30 s -say" )
 					return true
 				}
 				
@@ -2152,15 +2129,29 @@ void function TrackerUtilityInit()
 				
 				bool toggle = StringToBool( param2 )
 				
-				int timeoutAmount = -1
-				timeoutAmount = ParseTimeString( ReturnParsableTimestringArgsAtIndex( args, 3 ) )			
+				int timeoutAmount = ParseTimeString( ReturnParsableTimestringArgsAtIndex( args, 3 ) )			
 				
 				string reason = Chat_FindReasonInArgs( args )
 				Timeout_SetPlayerTimedOut( timeoutPlayer, toggle, player.GetPlayerName(), timeoutAmount, reason )
-			
-				Message( player, "Success", format( "'%s' was put in timeout for '%s'\nReason: %s", player.GetPlayerName(), Chat_ReadableTime( timeoutAmount ), reason != "" ? reason : "{empty}" ) )
+							
+				string readableExpiresTime = Chat_ReadableExpiresTime( Timeout_GetTimeoutExpiresTimestamp( timeoutPlayer ) )	
+					
+				string timeoutMessage = format( "%s was put in timeout for (%s)\nReason: %s", player.GetPlayerName(), readableExpiresTime, reason != "" ? reason : "{empty}" )
+				Message( player, "Success", timeoutMessage )
+				
+				if( args.contains( "-say" ) )
+				{
+					foreach( s_player in GetPlayerArray() )
+					{
+						if( s_player == timeoutPlayer )
+							continue 
+							
+						SendResponse( s_player, timeoutMessage )
+					}
+				}
+				
 				break
-			}
+			}		
 			case "gettimeout":
 			{
 				if( param == "" )
@@ -2188,17 +2179,34 @@ void function TrackerUtilityInit()
 					return true 
 				}
 			
-				  if ( player.IsNoclipping() )
+				if ( player.IsNoclipping() )
 					player.SetPhysics( MOVETYPE_WALK )
-				  else
+				else
 					player.SetPhysics( MOVETYPE_NOCLIP )
 					
 				break
 			}
-			
-			default:	
-					Message( player, "Usage", "cc #command #param1 #param2 #..." )
+			case "disable_rotate":
+			{
+				if( param == "" || !IsStringBool( param ) )
+				{
+					Message( player, "Failed", format( "Param 1 of command \"%s\" requires bool 0|1|false|true", command ) )
 					return true
+				}
+				
+				string bSettingValue = StringToBool( param ) ? "true" : "false"
+				Dev_CommandLineAddParm( "autoRotateForceDisable", bSettingValue )
+				
+				Message( player, "Success", format( "Force Auto map rotation was set to \"%s\"", bSettingValue ) )
+				break
+			}
+			//more...
+			
+			default:
+			{			
+				Message( player, "Usage", "cc #command #param1 #param2 #..." )
+				return true
+			}
 		}
 			
 		return true
@@ -2463,7 +2471,7 @@ bool function IsStringNumeric( string str, int ornull min = null, int ornull max
 }
 
 
-bool function IsFloat( string str, float min = INT_MAX, float limit = INT_MIN )  //cleanup
+bool function IsStringFloat( string str, float min = INT_MAX, float limit = INT_MIN )  //cleanup
 {
 	if ( str.len() == 0 ) 
 		return false
@@ -2563,7 +2571,24 @@ entity function GetPlayerEntityByName( string name ) //deprecate use universal l
 			return player
 	}
 	
+	if( file.bAllowLooseNameComp )
+		p = GetPlayerEntityByName_Loose( name )	
+		
 	return p
+}
+
+entity function GetPlayerEntityByName_Loose( string name )
+{
+	string candidate
+	foreach( player in GetPlayerArray() )
+	{
+		candidate = player.GetPlayerName().tolower()
+		if( candidate.find( name ) != -1 )
+			return player
+	}
+	
+	entity invalid 
+	return invalid
 }
 
 void function CheckAdmin_OnConnect( entity player )
@@ -2574,11 +2599,11 @@ void function CheckAdmin_OnConnect( entity player )
 	if( IsServerAdmin( player.GetPlatformUID() ) ) //use new oid list
 	{
 		player.SetPlayerNetBool( "IsAdmin", true )
-		Remote_CallFunction_UI(player, "UICallback_AdminStatus", true )
+		Remote_CallFunction_UI( player, "UICallback_AdminStatus", true )
 		
-		printw( "CheckAdmin_OnConnect ADMIN DETECTED", player.GetPlayerName(), "IsAdmin netvar = TRUE, and UI VM var set" )
+		//printw( "CheckAdmin_OnConnect ADMIN DETECTED", player.GetPlayerName(), "IsAdmin netvar = TRUE, and UI VM var set" )
 	} else
-		Remote_CallFunction_UI(player, "UICallback_AdminStatus", false ) //refresh
+		Remote_CallFunction_UI( player, "UICallback_AdminStatus", false ) //refresh
 }
 
 bool function IsAuthEnabled()
@@ -2794,6 +2819,7 @@ string function ParseWeapon( string weaponString )
 			mods.remove( i )
 		}
 	}
+	
 	
 	if ( removed )
 		PrintSupportedAttachpointsForWeapon( mods[ 0 ] )
@@ -3083,6 +3109,11 @@ bool function SendResponse( entity player, string msg, bool bAdmin = false )
 	return true
 }
 
+void function BroadcastResponse( string msg, bool bAdmin = false )
+{
+	BroadcastServerTextMessage( SYSTEM_RESPONSE, msg, bAdmin )
+}
+
 bool function SendPM( entity fromPlayer, entity toPlayer, string msg )
 {
 	if( !IsValid( fromPlayer ) || ( !IsValid( toPlayer ) ) )
@@ -3129,8 +3160,10 @@ void function CodeCallback_SendMessage( string criteria, string fromWebPanelUser
 }
 
 array<string> function ReturnParsableTimestringArgsAtIndex( array<string> args, int index )
-{
+{	
 	array<string> returnArgs
+	if( index <= 0 || args.len() <= index )
+		return returnArgs
 	
 	int argLen = args.len()
 	for( int i = index; i < argLen; i++ )

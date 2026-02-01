@@ -368,6 +368,10 @@ global enum eDamageSourceId
 	mp_weapon_proximity_mine
 	mp_weapon_grenade_rev_shell
 	mp_ability_devices_jammer
+	
+	//custom new
+	mp_weapon_sentinel_grapples
+	mp_ability_grapple_grapples
 }
 
 //When adding new mods, they need to be added below and to persistent_player_data_version_N.pdef in r1/cfg/server.

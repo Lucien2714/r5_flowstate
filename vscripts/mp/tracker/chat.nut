@@ -11,7 +11,7 @@ global function Chat_CheckGlobalMute
 
 global function Chat_GetMutedReason
 global function Chat_FindReasonInArgs
-global function Chat_ReadableTime
+global function Chat_ReadableExpiresTime
 
 global function Chat_GetAllEffects
 global function Chat_FindEffect
@@ -131,15 +131,13 @@ void function RegisterAllChatCommands() //if chat commands enabled.
 	switch( Playlist() )
 	{
 		case ePlaylists.fs_scenarios:
-
 			Commands_Register( "!rest", cmd_rest, [ "/rest", "\\rest" ] )
 			Commands_Register( "!team", cmd_team, [ "/team", "\\team" ] )
-			break
+		break
 
 		case ePlaylists.fs_1v1:
 		case ePlaylists.fs_lgduels_1v1:
 		case ePlaylists.fs_vamp_1v1:
-
 			Commands_Register( "!wait", cmd_wait, [ "/wait", "\\wait" ] )
 			Commands_Register( "!rest", cmd_rest, [ "/rest", "\\rest" ] )
 			Commands_Register( "!info", cmd_info, [ "/info", "\\info" ] )
@@ -158,7 +156,7 @@ void function RegisterAllChatCommands() //if chat commands enabled.
 					Commands_Register( "!legend", cmd_legend, [ "/legend", "\\legend" ] )
 					Commands_Register( "!outlist", cmd_outlist, [ "/outlist", "\\outlist" ] )
 			}
-			break
+		break
 	}
 }
 
@@ -654,7 +652,7 @@ bool function Chat_ToggleMuteForAll( entity player, bool toggle = true, bool cmd
 			string byPlayerUid = IsValid( entByPlayer ) && entByPlayer.IsPlayer() ? entByPlayer.p.UID : SERVER_MUTE
 			byPlayerUid = byPlayer != "" ? byPlayer : byPlayerUid
 
-			string expiry = timestamp <= 0 ? "" : Chat_ReadableTime( timestamp )
+			string expiry = timestamp <= 0 ? "" : Chat_ReadableExpiresTime( timestamp )
 			ToggleTextBan( uid, reason, expiry, byPlayerUid, toggle, timestamp )//code func
 		#else
 			ToggleMute( player, toggle )
@@ -1071,21 +1069,25 @@ int function ParseTimeString( array<string> args )
 		{
 			case "year":
 			case "years":
+			case "y":
 				addTime += ( timeAmount * 31557600 )
 				break
 
 			case "month":
 			case "months":
+			case "m":
 				addTime += ( timeAmount * 2629800 ) //avg
 				break
 
 			case "day":
 			case "days":
+			case "d":
 				addTime += ( timeAmount * 86400 )
 				break
 
 			case "hour":
 			case "hours":
+			case "h":
 				addTime += ( timeAmount * 3600 )
 				break
 
@@ -1093,6 +1095,7 @@ int function ParseTimeString( array<string> args )
 			case "mins":
 			case "minute":
 			case "minutes":
+			case "m":
 				addTime += ( timeAmount * 60 )
 				break
 
@@ -1100,6 +1103,7 @@ int function ParseTimeString( array<string> args )
 			case "secs":
 			case "second":
 			case "seconds":
+			case "s":
 				addTime += ( timeAmount * 1 )
 				break
 
@@ -1118,7 +1122,7 @@ int function ParseTimeString( array<string> args )
 	return addTime
 }
 
-string function Chat_ReadableTime( int unmuteTime )
+string function Chat_ReadableExpiresTime( int unmuteTime )
 {
 	int currentTime = GetUnixTimestamp()
 	int diff = unmuteTime - currentTime

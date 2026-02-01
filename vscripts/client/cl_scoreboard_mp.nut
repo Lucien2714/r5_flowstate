@@ -108,6 +108,9 @@ void function ClScoreboardMp_Init()
 	AddClientCallback_OnResolutionChanged( ReInitScoreboard )
 	file.bResetScoreboardIgnore = IGNORE_SCORE_BOARD_RESET.contains( Gamemode() )
 	file.max_teams = GetCurrentPlaylistVarInt( "max_teams", MAX_TEAM_SLOTS )
+	
+	if( Playlist() == ePlaylists.fs_vamp_1v1 )
+		RegisterConCommandTriggeredCallback( "toggle_map", ScoreboardToggleFocus )
 }
 
 void function ReInitScoreboard( )
@@ -187,10 +190,8 @@ void function InitScoreboardMP()
 	file.titleCustom = HudElement( "FS_DMScoreboard_Title" )
 	file.hintCustom = HudElement( "FS_DMScoreboard_Hint" )
 	
-	if( Playlist() == ePlaylists.fs_1v1 || Playlist() == ePlaylists.fs_lgduels_1v1 )
-	{
-		Hud_SetText( file.hintCustom, "%toggle_map% Close")
-	}
+	if( g_bIs1v1GameType() ) //Playlist() == ePlaylists.fs_1v1 || Playlist() == ePlaylists.fs_lgduels_1v1 )
+		Hud_SetText( file.hintCustom, "%toggle_map% " + Localize( "#CLOSE" ) )
 	
 	string title = "SCOREBOARD"
 
