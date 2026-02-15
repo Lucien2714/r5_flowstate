@@ -93,7 +93,7 @@ global struct SH_flowstateSettings
 	bool CycleHaloPlaylists
 	bool EnableReporting
 	bool EndlessFFAorTDM
-	
+	bool shouldRegisterGrapplesNGunsAudio
 }
 
 global SH_flowstateSettings fsGlobal
@@ -194,6 +194,7 @@ void function Initialize_SH_FlowstateSettings()
 	fsGlobal.CycleHaloPlaylists						= GetCurrentPlaylistVarBool( "cycle_halo_playlists", false )
 	fsGlobal.EnableReporting						= GetCurrentPlaylistVarBool( "enable_reporting", false )
 	fsGlobal.EndlessFFAorTDM						= GetCurrentPlaylistVarBool( "flowstateEndlessFFAorTDM", false )
+	fsGlobal.shouldRegisterGrapplesNGunsAudio		= GetCurrentPlaylistVarBool( "register_grapples_audio", false )
 }
 
 //Todo(mk): The following function calls need replaced 

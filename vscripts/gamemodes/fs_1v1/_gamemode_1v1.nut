@@ -240,6 +240,7 @@ struct
 	bool bNoSecondary
 	bool bNoPrimaryLongrange
 	bool bNoSecondaryLongrange
+	bool bApplyStateFlags
 	
 } settings
 
@@ -317,6 +318,7 @@ void function Gamemode1v1_Init( int eMap )
 		AddClientCommandCallback( "CC_1v1_Charm", CC_1v1_WeaponCharm )
 		AddClientCommandCallback( "CC_1v1_MaxEnemyLatency", CC_1v1_MaxEnemyLatency )
 		AddClientCommandCallback( "CC_1v1_MaxIBMMTime", CC_1v1_MaxIBMMTime )
+		AddClientCommandCallbackVoid( "CC_1v1_SettingsSent", CC_1v1_SettingsSent )
 	}
 	else if( bIsCoachingMode() )
 	{
@@ -635,7 +637,9 @@ void function FS1v1_OnEntitiesDidLoad()
 							
 						player.EndSignal( "OnDestroy" )
 						//player.WaitSignal( "SettingsReceieved" )
-						waitthread WaitSignalOrTimeout( player, 15, "SettingsReceieved" )//(mk): to prevent potential leak in the event client commands are disabled or throttled
+						
+						if( !player.p.b1v1SettingsSet )
+							waitthread WaitSignalOrTimeout( player, 15, "SettingsReceieved" )//(mk): to prevent potential leak in the event client commands are disabled or throttled
 					
 						if ( player.p.start_in_rest_setting && !Gamemode1v1_IsPlayerInState( player, e1v1State.RESTING ) )
 							Gamemode1v1_ForceRest( player )
@@ -732,10 +736,20 @@ bool function CC_1v1_WeaponCharm( entity player, array<string> args )
 
 bool function CC_1v1_Heirloom( entity player, array<string> args )
 {
-	if( !IsValid( player ) || !args.len() || !IsStringNumeric( args[0] ) )
+	if( !IsValid( player ) || !args.len() || !IsStringNumeric( args[ 0 ] ) )
 		return false
 	
-	player.p.chosenHeirloom = ClampInt( args[0].tointeger(), 0, 5 )
+	int heirloomId = args[ 0 ].tointeger()
+	
+	if( IsHeirloomRegistered( heirloomId ) )
+		player.p.chosenHeirloom = heirloomId
+	else
+	{
+		if( player.p.b1v1SettingsSet )
+			LocalMsg( player, "#FS_FAILED", "#UNREGISTERED_HEIRLOOOM", eMsgUI.NOTIFICATION )
+			
+		return true
+	}
 	
 	if( IsAlive( player ) && Gamemode1v1_IsPlayerInState( player, e1v1State.RESTING ) )
 		FS_GiveRandomMelee( player, true )
@@ -768,10 +782,17 @@ bool function CC_1v1_MaxIBMMTime( entity player, array<string> args )
 	if( !IsValid( player ) || !args.len() || !IsStringNumeric( args[0] ) )
 		return false
 
-	player.p.IBMM_grace_period = NormalizeGracePeriod( Clamp( args[0].tofloat(), 0.0, 30.0 ) )
-	player.Signal( "SettingsReceieved" )
-	
+	player.p.IBMM_grace_period = NormalizeGracePeriod( Clamp( args[0].tofloat(), 0.0, 30.0 ) )	
 	return true
+}
+
+void function CC_1v1_SettingsSent( entity player, array<string> args )
+{
+	if( player.p.b1v1SettingsSet )
+		return
+		
+	player.Signal( "SettingsReceieved" )
+	player.p.b1v1SettingsSet = true
 }
 
 float function NormalizeGracePeriod( float f_userSelection )
@@ -809,13 +830,13 @@ void function BannerImages_1v1Init()
 	float defaultWidth 	= 480 //todo playlistvar
 	float defaultHeight	= 270 //todo playlistvar
 	
-	LocPair setBannerLoc = NewLocPair( BannerAssets_BannerVisibilityMover( getWaitingRoomLocation().origin, getWaitingRoomLocation().angles, testOrigin, testAngles, defaultWidth, defaultHeight ), testAngles )
+	LocPair setBannerLoc = NewLocPair( WorldAssets_GroupVisibilityMover( getWaitingRoomLocation().origin, getWaitingRoomLocation().angles, testOrigin, testAngles, defaultWidth, defaultHeight ), testAngles )
 	
-	BannerAssets_SetAllGroupsFunc
+	WorldAssets_SetAllGroupsFunc
 	(
 		void function() : ( setBannerLoc, defaultWidth, defaultHeight )
 		{
-			BannerAssets_RegisterGroup
+			WorldAssets_RegisterGroup
 			(
 				"main_banner",
 				setBannerLoc,
@@ -827,7 +848,7 @@ void function BannerImages_1v1Init()
 		}
 	)
 	
-	BannerAssets_SetAllAssetsFunc
+	WorldAssets_SetAllAssetsFunc
 	(
 		void function()
 		{
@@ -836,25 +857,15 @@ void function BannerImages_1v1Init()
 				string assetList = GetCurrentPlaylistVarString( "banner_assets", "" )
 				
 				if( !empty( assetList ) )
-				{	
-					array<string> playlistBannerAssets = StringToArray( assetList )
+				{
+					array<string> playlistWorldAssets = StringToArray( assetList )
 					
-					foreach( assetRef in playlistBannerAssets )
+					foreach( assetRef in playlistWorldAssets )
 					{
-						int refID = WorldDrawAsset_AssetRefToID( assetRef )
-						
-						if( refID != -1 )
-						{
-							BannerAssets_GroupAppendAsset
-							(
-								"main_banner",
-								refID
-							)
-						}
+						if( WorldDrawAsset_IsAssetRefValid( assetRef ) )
+							WorldAssets_GroupAppendAsset( "main_banner", assetRef )
 						else
-						{
 							sqerror( format( "Invalid BannerAsset. Skipping asset: '%s'", assetRef ) )
-						}
 					}
 				}
 			}
@@ -865,7 +876,7 @@ void function BannerImages_1v1Init()
 		}
 	)
 	
-	BannerAssets_Init()
+	WorldAssets_Init()
 }
 
 void function INIT_PregameCallbacks()
@@ -1204,6 +1215,7 @@ void function INIT_PlaylistSettings()
 	settings.giveCharmsWeapons 						= GetCurrentPlaylistVarBool( "flowstate_givecharms_weapons", false )
 	settings.giveSkinsWeapons 						= GetCurrentPlaylistVarBool( "flowstate_giveskins_weapons", false )
 	settings.enableCosmetics 						= GetCurrentPlaylistVarBool( "flowstate_enable_cosmetics", false )
+	settings.bApplyStateFlags						= GetCurrentPlaylistVarBool( "enable_state_flags", true )
 }
 
 bool function Gamemode1v1_AreCustomWeaponsAllowedForPlayer( entity player )
@@ -3069,7 +3081,7 @@ void function soloModePlayerToWaitingList( entity player, bool isWinner = false,
 		MakeInvincible(player)
 
 	if( !fromResting && !(Gamemode1v1_GetPlayerGamestate( player ) == e1v1State.INVALID) )
-		Gamemode1v1_TeleportPlayer( player, getWaitingRoomLocation() ) //new
+		Gamemode1v1_TeleportPlayer( player, g_waitingRoomSpawnLocations.getrandom() ) //new
 	
 	Gamemode1v1_SetPlayerGamestate( player, e1v1State.WAITING )
 		
@@ -3154,7 +3166,7 @@ void function scenarios_soloModePlayerToWaitingList( entity player, bool isWinne
 		return
 	
 	Gamemode1v1_SetPlayerGamestate( player, e1v1State.WAITING )
-	Gamemode1v1_TeleportPlayer( player, getWaitingRoomLocation() ) //new
+	Gamemode1v1_TeleportPlayer( player, g_waitingRoomSpawnLocations.getrandom() ) //new
 	
 	player.SetMinimapZoomScale( 0.75, 3.0 ) // (cafe) There should be a better place for this call
 
@@ -3569,7 +3581,30 @@ void function respawnInSoloMode( entity player, int respawnSlotIndex = -1 ) //å¤
 
 		TakeAllWeapons( player )
 		FS_GiveRandomMelee( player, true )
+		
+		if( settings.bApplyStateFlags )
+		{
+			int stateFlags = player.e.stateFlags
+			if( !( stateFlags & STATE_FLAG_NO_DAMAGE ) )
+				player.e.stateFlags = stateFlags | STATE_FLAG_NO_DAMAGE
+			
+			if( player.GetMeleeDisabled() == 0 )
+				player.SetMeleeDisabled()
+		}
+		
 		return
+	}
+	else
+	{
+		if( settings.bApplyStateFlags )
+		{
+			int stateFlags = player.e.stateFlags
+			if( stateFlags & STATE_FLAG_NO_DAMAGE )
+				player.e.stateFlags = stateFlags & ~STATE_FLAG_NO_DAMAGE
+			
+			if( player.GetMeleeDisabled() == 1 )
+				player.ClearMeleeDisabled()
+		}
 	}
 
 	if ( respawnSlotIndex == -1 ) 
@@ -4843,7 +4878,7 @@ void function ForceAllRoundsToFinish_solomode()
 		if( Gamemode1v1_IsPlayerWaiting( player ) )
 			continue
 		
-		Gamemode1v1_TeleportPlayer( player, getWaitingRoomLocation() )
+		Gamemode1v1_TeleportPlayer( player, g_waitingRoomSpawnLocations.getrandom() )
 		// soloModePlayerToWaitingList( player )
 		if( Gamemode1v1_IsPlayerResting( player ) )
 			Gamemode1v1_RemovePlayerFromRestingList( player )
@@ -5374,7 +5409,7 @@ void function Gamemode1v1_OnPlayerKilled( entity victim, entity attacker, var da
 		}
 
 		// ClearInvincible( victim ) 
-		Gamemode1v1_TeleportPlayer( victim, getWaitingRoomLocation() )
+		Gamemode1v1_TeleportPlayer( victim, g_waitingRoomSpawnLocations.getrandom() )
 		return
 	}
 	return
@@ -5416,7 +5451,7 @@ void function Gamemode1v1_OnSpawned( entity player )
 	if( GetTDMState() != eTDMState.IN_PROGRESS )
 		Gamemode1v1_SetPlayerGamestate( player, e1v1State.INVALID )
 	
-	Gamemode1v1_TeleportPlayer( player, getWaitingRoomLocation() )
+	Gamemode1v1_TeleportPlayer( player, g_waitingRoomSpawnLocations.getrandom() )
 	player.UnfreezeControlsOnServer()
 }
 
@@ -5428,7 +5463,7 @@ void function ValidateBlacklistedWeapons( array<string> Weapons ) //(mk): modifi
 	{
 		int sliceIndex = Weapons[ i ].find( " " )		
 		if( sliceIndex > -1 )
-		{	
+		{
 			string weaponName = Weapons[ i ].slice( 0, sliceIndex )
 			
 			if( GetBlackListedWeapons().contains( weaponName ) )
@@ -5440,16 +5475,6 @@ void function ValidateBlacklistedWeapons( array<string> Weapons ) //(mk): modifi
 				Weapons.remove( i )
 		}
 	}
-}
-
-void function DisablePlayerCollision( entity player )
-{
-	player.kv.contents = CONTENTS_BULLETCLIP | CONTENTS_MONSTERCLIP | CONTENTS_HITBOX | CONTENTS_BLOCKLOS | CONTENTS_PHYSICSCLIP; //CONTENTS_PLAYERCLIP
-}
-
-void function EnablePlayerCollision( entity player )
-{
-	player.kv.contents = CONTENTS_BULLETCLIP | CONTENTS_MONSTERCLIP | CONTENTS_HITBOX | CONTENTS_BLOCKLOS | CONTENTS_PHYSICSCLIP | CONTENTS_PLAYERCLIP
 }
 
 void function DecideToggleCollision_Rest( entity player, bool enable )

@@ -1446,17 +1446,13 @@ void function MutedList_Remove( string uid )
 void function CodeCallback_MuteFromRemote( string uid, string reason, bool toggle, int timeoutAmount, string byPlayerUID )
 {
 	entity player = GetPlayer( uid )
-	if ( IsValid( !player ) )//this should never happen, natives verifies player is in server before calling this function. Todo: Just send the SQEntity
-		return
+	if( IsValid( player ) )
+	{
+		if( toggle )
+			SendResponse( player, format( "You were muted for: %s", reason ), true )
+		else
+			SendResponse( player, "You were unmuted", true )
+	}
 
-	if( toggle )
-		SendResponse( player, format( "You were muted for: %s", reason ), true )
-	else
-		SendResponse( player, "You were unmuted", true )
-
-	Chat_ToggleMuteForAll( player, toggle, true, [ "-reason", reason ], timeoutAmount, uid, null, byPlayerUID  )
-}
-
-void function autoReminder(){
-
+	Chat_ToggleMuteForAll( player, toggle, true, [ "-reason", reason ], timeoutAmount, uid, null, byPlayerUID  ) //this func will check for a valid player or use uid to attempt mutelist update.
 }

@@ -57,6 +57,9 @@ void function InitHudOptionsPanel( var panel )
 
 	SetupSettingsButton( Hud_GetChild( contentPanel, "SwitchEnableMotd" ), "#HUD_ENABLE_MOTD", "#HUD_ENABLE_MOTD_DESC", $"rui/menu/settings/settings_hud" )
 	SetupSettingsButton( Hud_GetChild( contentPanel, "SwitchShowMotd" ), "#HUD_SHOW_MOTD", "#HUD_SHOW_MOTD_DESC", $"rui/menu/settings/settings_hud" )
+	SetupSettingsButton( Hud_GetChild( contentPanel, "SwitchShowPos" ), "#HUD_SHOW_POS", "#HUD_SHOW_POS_DESC", $"rui/menu/settings/settings_hud" )
+	SetupSettingsButton( Hud_GetChild( contentPanel, "SwitchShowFPS" ), "#HUD_SHOW_FPS", "#HUD_SHOW_FPS_DESC", $"rui/menu/settings/settings_hud" )
+	SetupSettingsButton( Hud_GetChild( contentPanel, "SwitchShowDevWarning" ), "#HUD_SHOW_DEV_WARNING", "#HUD_SHOW_DEV_WARNING_DESC", $"rui/menu/settings/settings_hud" )
 
 	AddPanelFooterOption( panel, LEFT, BUTTON_B, true, "#B_BUTTON_BACK", "#B_BUTTON_BACK" )
 	AddPanelFooterOption( panel, LEFT, BUTTON_BACK, true, "#BACKBUTTON_RESTORE_DEFAULTS", "#RESTORE_DEFAULTS", OpenConfirmRestoreHUDDefaultsDialog )
@@ -93,6 +96,26 @@ void function InitHudOptionsPanel( var panel )
 	
 	file.conVarDataList.append( CreateSettingsConVarData( "enable_motd", eConVarType.INT ) )
 	file.conVarDataList.append( CreateSettingsConVarData( "open_motd_once_per_server", eConVarType.INT ) )
+	file.conVarDataList.append( CreateSettingsConVarData( "cl_showpos_archived", eConVarType.INT ) )
+	file.conVarDataList.append( CreateSettingsConVarData( "cl_showfps_archived", eConVarType.INT ) )
+	file.conVarDataList.append( CreateSettingsConVarData( "show_dev_warning_dialogue", eConVarType.INT ) )
+
+	UpdateArchivedConvars() //(mk): Make sure archived settings are applied on initial ui load.
+	AddCallback_UiSettingsUpdated( UpdateArchivedConvars )
+}
+
+void function UpdateArchivedConvars() //(mk): the purpose of this is to use a script registered convar to control convars not marked as archive already present in the engine.
+{
+	int currentShowPosArchived 		= GetConVarInt( "cl_showpos_archived" )
+	int currentClShowPos 			= GetConVarInt( "cl_showpos" )
+	int currentShowFPSArchived 		= GetConVarInt( "cl_showfps_archived" )
+	int currentClShowFPS			= GetConVarInt( "cl_showfps" )
+	
+	if( currentShowPosArchived != currentClShowPos )
+		SetConVarInt( "cl_showpos", currentShowPosArchived )
+		
+	if( currentShowFPSArchived != currentClShowFPS )
+		SetConVarInt( "cl_showfps", currentShowFPSArchived )
 }
 
 void function OpenConfirmRestoreHUDDefaultsDialog( var button )
@@ -147,6 +170,9 @@ void function RestoreHUDDefaults()
 	
 	SetConVarToDefault( "enable_motd" )
 	SetConVarToDefault( "open_motd_once_per_server" )
+	SetConVarToDefault( "cl_showpos_archived" )
+	SetConVarToDefault( "cl_showfps_archived" )
+	SetConVarToDefault( "show_dev_warning_dialogue" )
 
 	SaveSettingsConVars( file.conVarDataList )
 

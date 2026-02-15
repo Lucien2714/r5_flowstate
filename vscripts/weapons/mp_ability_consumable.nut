@@ -452,7 +452,10 @@ void function OnWeaponActivate_Consumable( entity weapon )
 	#if SERVER
 		weaponOwner.p.playerIsPlantingBomb = true
 		modName = file.playerToNextMod[ weaponOwner ]
-		printt( format( "[CONSUMABlE-%s] Activating consumable (%s)", weaponOwner.GetPlayerName(), modName ) )
+		
+		#if DEVELOPER
+			printt( format( "[CONSUMABlE-%s] Activating consumable (%s)", weaponOwner.GetPlayerName(), modName ) )
+		#endif
 
 		Signal( weaponOwner, "StartHeal" )
 		weaponOwner.SetPlayerNetBool( "isHealing", true )
@@ -478,7 +481,10 @@ void function OnWeaponActivate_Consumable( entity weapon )
 		weaponOwner.p.playerIsPlantingBomb = true
 
 		modName = file.clientPlayerNextMod
-		printt( format( "[CONSUMABlE] Activating consumable (%s)", modName ) )
+		
+		#if DEVELOPER
+			printt( format( "[CONSUMABlE] Activating consumable (%s)", modName ) )
+		#endif
 
 		if ( IsSpectator( GetLocalClientPlayer() ) )
 		{
@@ -506,7 +512,10 @@ void function OnWeaponActivate_Consumable( entity weapon )
 
 		weapon.SetScriptTime0( Time() ) // sets heal start time for rui
 		weapon.SetMods( [ modName ] )
-		printt( format( "[CONSUMABlE-%s] OnWeaponActivate_Consumable: Add mod (%s)", weaponOwner.GetPlayerName(), modName ) )
+		
+		#if DEVELOPER
+			printt( format( "[CONSUMABlE-%s] OnWeaponActivate_Consumable: Add mod (%s)", weaponOwner.GetPlayerName(), modName ) )
+		#endif
 	}
 
 	ConsumablePersistentData useData
@@ -1001,8 +1010,10 @@ var function OnWeaponPrimaryAttack_Consumable( entity weapon, WeaponPrimaryAttac
 
 	string currentMod = GetConsumableModOnWeapon( weapon )
 
-	if ( IsValid( player ) )
-		printt( format( "[CONSUMABlE-%s] OnWeaponPrimaryAttack (%s)", player.GetPlayerName(), currentMod ) )
+	#if DEVELOPER
+		if ( IsValid( player ) )
+			printt( format( "[CONSUMABlE-%s] OnWeaponPrimaryAttack (%s)", player.GetPlayerName(), currentMod ) )
+	#endif
 
 	if ( currentMod == "" )
 		return 0
@@ -1659,7 +1670,10 @@ void function UpdateConsumableUse( entity player, ConsumableInfo info, Consumabl
 			else if ( shouldUpdateHealth )
 			{
 				StatusEffect_Stop( player, useData.healthStatusHandle )
-				useData.healthStatusHandle = StatusEffect_AddEndless( player, eStatusEffect.target_health, (healthToApply + resourceHealthRemaining) / float(healthMax) )
+				int endHealth = minint( virtualHealth + healthToApply, healthMax )
+				float targetHealthFrac = endHealth / float( healthMax )
+
+				useData.healthStatusHandle = StatusEffect_AddEndless( player, eStatusEffect.target_health, targetHealthFrac )
 			}
 		}
 	}
@@ -1696,10 +1710,14 @@ void function UpdateConsumableUse( entity player, ConsumableInfo info, Consumabl
 		if ( shouldUpdateShields )
 		{
 			StatusEffect_Stop( player, useData.shieldStatusHandle )
-			float targetShields = 0
-			if ( shieldHealthMax > 0 )
-				targetShields = shieldAmount / float( shieldHealthMax )
-			useData.shieldStatusHandle = StatusEffect_AddEndless( player, eStatusEffect.target_shields, targetShields )
+			int shieldsToApply = minint( int( shieldAmount ), missingShields )
+			int endShields = minint( currentShields + shieldsToApply, shieldHealthMax )
+
+			float targetShieldsFrac = 0.0
+			if( shieldHealthMax > 0 )
+				targetShieldsFrac = endShields / float( shieldHealthMax )
+
+			useData.shieldStatusHandle = StatusEffect_AddEndless( player, eStatusEffect.target_shields, targetShieldsFrac )
 		}
 	}
 
@@ -2317,7 +2335,7 @@ bool function Consumable_CanUseConsumable( entity player, int consumableType, bo
 int function TryUseConsumable( entity player, int consumableType )
 {
 #if CLIENT
-	if( G_REGISTER_1V1_NETVARS_FOR_PLAYLIST.contains( Playlist() ) )
+	if( g_bIs1v1GameType() )
 	{
 		if( player.GetPlayerNetInt( "FS_1v1_PlayerState" ) == e1v1State.RESTING || player.GetPlayerNetInt( "FS_1v1_PlayerState" ) == e1v1State.SPECTATING )
 			return eUseConsumableResult.DENY_NONE

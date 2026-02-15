@@ -350,7 +350,7 @@ void function RemoteFunctions_Init_Begin()
 
 	if( Playlist() == ePlaylists.fs_movementrecorder )
 	{
-		ScriptRemote_RegisterClientFunction( "FS_MovementRecorder_UpdateHints", "int", 0, 21, "bool", "float", -1.0, FLT_MAX, 16 )
+		ScriptRemote_RegisterClientFunction( "FS_MovementRecorder_UpdateHints", "int", 0, 21, "bool", "float", -1.0, FLT_MAX, 32 )
 		ScriptRemote_RegisterClientFunction( "FS_MovementRecorder_CreateInputHintsRUI", "bool" )
 	}
 
@@ -367,7 +367,7 @@ void function RemoteFunctions_Init_Begin()
 	ScriptRemote_RegisterClientFunction( "ServerCallback_CreatesLaserFXFromServer", "entity", "vector", -1.0, 66000.0, 32, "vector", -32000.0, 32000.0, 32 )
 	
 	//Sentinel
-	ScriptRemote_RegisterClientFunction( "Flowstate_SentinelChargeHUD", "float", 0.0, 4000.0, 16 ) //Audit 2-22-2025 (mk): 66 mins server time, charge end max
+	ScriptRemote_RegisterClientFunction( "Flowstate_SentinelChargeHUD", "float", 0.0, 4000.0, 32 ) //Audit 2-22-2025 (mk): 66 mins server time, charge end max
 	
 	ScriptRemote_RegisterClientFunction( "ServerCallback_ShouldExitDrone" )
 	
@@ -417,7 +417,6 @@ void function RemoteFunctions_Init_Begin()
 				ScriptRegisterNetworkedVariable( "FS_Scenarios_gameStartTime", SNDC_PLAYER_EXCLUSIVE, SNVT_TIME )
 				ScriptRegisterNetworkedVariable( "FS_Scenarios_timePlayerEnteredInLobby", SNDC_PLAYER_EXCLUSIVE, SNVT_TIME )
 			
-				ScriptRegisterNetworkedVariable( "FS_1v1_PlayerState", SNDC_PLAYER_EXCLUSIVE, SNVT_INT )
 				Scenarios_RegisterNetworking() //(mk)
 			}
 			
@@ -447,15 +446,16 @@ void function RemoteFunctions_Init_Begin()
 			ScriptRegisterNetworkedVariable( "flowstate_DMRoundEndTime", SNDC_GLOBAL, SNVT_TIME, -1 )
 			ScriptRegisterNetworkedVariable( "FSDM_GameState", SNDC_GLOBAL, SNVT_INT, -1 )
 			
-			if( G_REGISTER_1V1_NETVARS_FOR_PLAYLIST.contains( Playlist() )  )
+			if( g_bIs1v1GameType()  )
 			{
 				ScriptRegisterNetworkedVariable( "FSDM_1v1_Enemy", SNDC_PLAYER_GLOBAL, SNVT_ENTITY )
 				ScriptRegisterNetworkedVariable( "FSDM_1v1_PositionInScoreboard", SNDC_PLAYER_GLOBAL, SNVT_INT, -1 )
 				ScriptRemote_RegisterClientFunction( "Gamemode1v1_ForceLegendSelector_Deprecated" ) //(mk): Todo clientsided ui activation
 				
 				ScriptRegisterNetworkedVariable( "FS_1v1_PlayerState", SNDC_PLAYER_EXCLUSIVE, SNVT_INT )
-
-				ScriptRemote_RegisterClientFunction( "ServerCallback_SpawnOrModifyClientSideDynamicLight", "vector", -32000.0, 32000.0, 32, "vector", -32000.0, 32000.0, 32, "int", 0, 10, "float", 0.0, 32000.0, 12, "float", 0.0, 32000.0, 12, "int", 0, 100 )
+				
+				if( Playlist() != ePlaylists.fs_scenarios )
+					ScriptRemote_RegisterClientFunction( "ServerCallback_SpawnOrModifyClientSideDynamicLight", "vector", -32000.0, 32000.0, 32, "vector", -32000.0, 32000.0, 32, "int", 0, 10, "float", 0.0, 32000.0, 12, "float", 0.0, 32000.0, 12, "int", 0, 100 )
 			}
 			
 			ScriptRemote_RegisterClientFunction( "DM_HintCatalog", "int", -100, 101, "entity" )//Audit 2-22-2025
@@ -497,7 +497,7 @@ void function RemoteFunctions_Init_Begin()
 		
 		case eGamemodes.fs_aimtrainer:
 			
-			BannerAssets_SetEnabled( false )
+			WorldAssets_SetEnabled( false )
 			
 			ScriptRemote_RegisterUIFunction( "OpenFRChallengesMenu" )
 			ScriptRemote_RegisterUIFunction( "CloseFRChallengesMenu" )
@@ -530,7 +530,7 @@ void function RemoteFunctions_Init_Begin()
 		
 		case eGamemodes.fs_snd: //(mk): can save 15 slots byRef || save buffer by using entity over encodedEhandle
 			
-			BannerAssets_SetEnabled( false )
+			WorldAssets_SetEnabled( false )
 			
 			ScriptRemote_RegisterClientFunction("Sh_SetAttackingLocations", "int", 0, 10)
 			ScriptRemote_RegisterClientFunction("Sh_SetAttackerTeam", "int", 0, 10, "int", INT_MIN, INT_MAX)
@@ -574,7 +574,7 @@ void function RemoteFunctions_Init_Begin()
 		
 		case eGamemodes.fs_infected:
 		
-			BannerAssets_SetEnabled( false )
+			WorldAssets_SetEnabled( false )
 		
 			ScriptRegisterNetworkedVariable( "isPlayerShadowForm", SNDC_PLAYER_GLOBAL, SNVT_BOOL, false )
 			ScriptRemote_RegisterClientFunction("ApplyInfectedHUD")
@@ -631,7 +631,7 @@ void function RemoteFunctions_Init_Begin()
 			
 		case eGamemodes.fs_prophunt:
 		
-			BannerAssets_SetEnabled( false )
+			WorldAssets_SetEnabled( false )
 			
 			ScriptRemote_RegisterClientFunction("ServerCallback_FSDM_SetScreen", "int", 0, 255, "int", INT_MIN, INT_MAX, "int", INT_MIN, INT_MAX, "int", 0, 255)
 			ScriptRemote_RegisterClientFunction("ServerCallback_FSDM_OpenVotingPhase", "bool")
@@ -663,7 +663,7 @@ void function RemoteFunctions_Init_Begin()
 		case eGamemodes.CUSTOM_CTF:
 			// CTF: Server to Client
 			
-			BannerAssets_SetEnabled( false )
+			WorldAssets_SetEnabled( false )
 			
 			ScriptRemote_RegisterClientFunction( "ServerCallback_CTF_AddPointIcon", "entity", "entity", "int", 0, 255)
 			ScriptRemote_RegisterClientFunction( "ServerCallback_CTF_RecaptureFlag", "int", 0, 999, "float", 0.0, 999.0, 32, "float", 0.0, 999.0, 32, "bool")
@@ -718,9 +718,9 @@ void function RemoteFunctions_Init_Begin()
 	
 	ScriptRemote_RegisterClientFunction( "SCB_AddGrenadeIndicatorForEntity", "entity", "entity", "float", 0.0, 99999.0, 32 )//Audit 2-22-2025
 	ScriptRemote_RegisterUIFunction( "ScriptCallback_UnlockAchievement", "int", 0, achievements.len() + 1 ) //Audit 2-22-2025
-	ScriptRemote_RegisterClientFunction( "ServerCallback_SonarPulseFromPosition", "vector", -32000.0, 32000.0, 32, "float", 0.0, 3000.0, 16, "float", 0.0, 10.0, 16, "bool" ) //Audit 2-22-2025
+	ScriptRemote_RegisterClientFunction( "ServerCallback_SonarPulseFromPosition", "vector", -32000.0, 32000.0, 32, "float", 0.0, 3000.0, 32, "float", 0.0, 10.0, 32, "bool" ) //Audit 2-22-2025
 	
-	ScriptRemote_RegisterClientFunction( "ServerCallback_SonarPulseConeFromPosition", "vector", -32000.0, 32000.0, 32, "float", 0.0, 32000.0, 16, "vector", -1.0, 1.0, 32, "float", -360.0, 360.0, 16, "int", 0, 128, "float", 0.0, 32000.0, 32, "bool", "bool" )
+	ScriptRemote_RegisterClientFunction( "ServerCallback_SonarPulseConeFromPosition", "vector", -32000.0, 32000.0, 32, "float", 0.0, 32000.0, 32, "vector", -1.0, 1.0, 32, "float", -360.0, 360.0, 32, "int", 0, 128, "float", 0.0, 32000.0, 32, "bool", "bool" )
 
 	ScriptRegisterNetworkedVariable( "playerAllowedToLeech", SNDC_PLAYER_EXCLUSIVE, SNVT_BOOL, true )
 
@@ -762,7 +762,7 @@ void function RemoteFunctions_Init_Begin()
 	RegisterServerVar( "winningTeam", null )
 
 	//Fade REVISIT
-	ScriptRemote_RegisterClientFunction( "ServerCallback_SonarPhaseChamber", "entity", "entity", "float", 0.0, 120.0, 16 )
+	ScriptRemote_RegisterClientFunction( "ServerCallback_SonarPhaseChamber", "entity", "entity", "float", 0.0, 120.0, 32 )
 	
 	// Attack/Defend based game modes
 	ScriptRegisterNetworkedVariable( "attackingTeam", SNDC_GLOBAL, SNVT_INT, TEAM_UNASSIGNED )
@@ -832,7 +832,7 @@ void function RemoteFunctions_Init_Begin()
 	
 	ScriptRemote_RegisterClientFunction( "ServerCallback_SquadEliminated", "int", TEAM_INVALID, 127 )
 
-	ScriptRemote_RegisterClientFunction( "ServerCallback_SendDeathRecapData", "int", EHANDLE_MIN, EHANDLE_MAX, "int", EHANDLE_MIN, EHANDLE_MAX, "int", EDAMAGESOURCE_MIN, RT_EDAMAGESOURCE_MAX, "int", DAMAGE_TYPE_MIN, INT_MAX, "int", -1, INT_MAX, "int", 0, INT_MAX, "int", 0, INT_MAX, "float", 0.0, 1.0, 32, "float", 0.0, 1.0, 32, "float", 0.0, 86400.0, 32, "int", -1, INT_MAX, "int", -1, 16 ) //Audit 2-22-2025
+	ScriptRemote_RegisterClientFunction( "ServerCallback_SendDeathRecapData", "int", EHANDLE_MIN, EHANDLE_MAX, "int", EHANDLE_MIN, EHANDLE_MAX, "int", EDAMAGESOURCE_MIN, RT_EDAMAGESOURCE_MAX, "int", DAMAGE_TYPE_MIN, INT_MAX, "int", -1, INT_MAX, "int", 0, INT_MAX, "int", 0, INT_MAX, "float", 0.0, 1.0, 32, "float", 0.0, 1.0, 32, "float", 0.0, 86400.0, 32, "int", -1, INT_MAX, "int", -1, 32 ) //Audit 2-22-2025
 	ScriptRemote_RegisterClientFunction( "ServerCallback_DeathRecapDataUpdated", "bool", "int", EHANDLE_MIN, EHANDLE_MAX ) //Audit 2-22-2025
 
 	if( Gamemode() == eGamemodes.SURVIVAL )
@@ -932,7 +932,7 @@ void function RemoteFunctions_Init_Begin()
 
 	ScriptRemote_RegisterUIFunction( "ServerCallback_GotBPFromPremier" )
 
-	ScriptRemote_RegisterClientFunction( "ServerCallback_RespawnBeaconStart", "float", 0.0, 5000.0, 16, "float", 0.0, 5000.0, 16 )
+	ScriptRemote_RegisterClientFunction( "ServerCallback_RespawnBeaconStart", "float", 0.0, 5000.0, 32, "float", 0.0, 5000.0, 32 )
 	ScriptRemote_RegisterClientFunction( "ServerCallback_RespawnBeaconStop" )
 	ScriptRemote_RegisterClientFunction( "ServerCallback_RefreshInventory" )
 	ScriptRemote_RegisterClientFunction( "ServerCallback_RefreshInventoryAndWeaponInfo" )
@@ -989,7 +989,7 @@ void function RemoteFunctions_Init_Begin()
 
 	ScriptRemote_RegisterClientFunction( "ServerCallback_NessyMessage", "int", 0, 51 )
 	ScriptRemote_RegisterClientFunction( "ServerCallback_PlayPassiveVoice", "int", 0, 51 )
-	ScriptRemote_RegisterClientFunction( "ServerCallback_YouDied", "entity", "float", -1.0, 1.0, 10, "int", EDAMAGESOURCE_MIN, RT_EDAMAGESOURCE_MAX, "float", 0.0, 5000.0, 16 ) //Audit 2-22-2025
+	ScriptRemote_RegisterClientFunction( "ServerCallback_YouDied", "entity", "float", -1.0, 1.0, 10, "int", EDAMAGESOURCE_MIN, RT_EDAMAGESOURCE_MAX, "float", 0.0, 5000.0, 32 ) //Audit 2-22-2025
 	ScriptRemote_RegisterClientFunction( "ServerCallback_YouRespawned" )
 
 	if ( !IsLobby() )
@@ -997,8 +997,8 @@ void function RemoteFunctions_Init_Begin()
 		
 	Bloodhound_TT_RegisterNetworking() // Bloodhound Town Takeover //Audit 2-22-2025
 
-	ScriptRemote_RegisterClientFunction( "ServerCallback_SetAssistInformation", "int", EDAMAGESOURCE_MIN, RT_EDAMAGESOURCE_MAX, "int", EHANDLE_MIN, EHANDLE_MAX, "int", EHANDLE_MIN, EHANDLE_MAX, "float", -1.0, 4000.0, 16 )//Audit 2-22-2025
-	ScriptRemote_RegisterClientFunction( "ServerCallback_DataKnifeStartLeech", "float", -1.0, 4000.0, 16 )//Audit 2-22-2025
+	ScriptRemote_RegisterClientFunction( "ServerCallback_SetAssistInformation", "int", EDAMAGESOURCE_MIN, RT_EDAMAGESOURCE_MAX, "int", EHANDLE_MIN, EHANDLE_MAX, "int", EHANDLE_MIN, EHANDLE_MAX, "float", -1.0, 4000.0, 32 )//Audit 2-22-2025
+	ScriptRemote_RegisterClientFunction( "ServerCallback_DataKnifeStartLeech", "float", -1.0, 4000.0, 32 )//Audit 2-22-2025
 	ScriptRemote_RegisterClientFunction( "ServerCallback_DataKnifeCancelLeech" )
 	ScriptRemote_RegisterClientFunction( "ServerCallback_ControlPanelRefresh", "int", EHANDLE_MIN, EHANDLE_MAX )//Audit 2-22-2025 currently not called.
 	//ScriptRemote_RegisterClientFunction( "ServerCallback_TurretRefresh", "int", EHANDLE_MIN, EHANDLE_MAX )//Audit 2-22-2025 not currently used
@@ -1008,7 +1008,7 @@ void function RemoteFunctions_Init_Begin()
 	ScriptRemote_RegisterClientFunction( "ServerCallback_OnEnemyDowned", "entity", "entity", "int", INT_MIN, INT_MAX, "int", EDAMAGESOURCE_MIN, RT_EDAMAGESOURCE_MAX )
 	ScriptRemote_RegisterClientFunction( "ServerCallback_PlayerConnectedOrDisconnected", "int", EHANDLE_MIN, EHANDLE_MAX, "int", 0, 20 ) //Audit 2-22-2025
 	ScriptRemote_RegisterClientFunction( "ServerCallback_PlayerChangedTeams", "entity", "int", TEAM_INVALID, 127, "int", TEAM_INVALID, 127 ) 
-	ScriptRemote_RegisterClientFunction( "ServerCallback_PlayerTookDamage", "float", 0.0, 50000.0, 16, "vector", -32000.0, 32000.0, 32, "int", DAMAGE_TYPE_MIN, INT_MAX, "int", EDAMAGESOURCE_MIN, RT_EDAMAGESOURCE_MAX, "int", EHANDLE_MIN, EHANDLE_MAX ) //Audit 2-22-2025; Todo(mk): damage does not need to be allocated for 50000.0, however many mods call an arbituary number and these need audited in order to lower this value to a reasonable number. Note: Damage gets normalized, which used to be int. Therefore we can get away with using 16 bits on the float which should return n.xyz 
+	ScriptRemote_RegisterClientFunction( "ServerCallback_PlayerTookDamage", "float", 0.0, 50000.0, 32, "vector", -32000.0, 32000.0, 32, "int", DAMAGE_TYPE_MIN, INT_MAX, "int", EDAMAGESOURCE_MIN, RT_EDAMAGESOURCE_MAX, "int", EHANDLE_MIN, EHANDLE_MAX ) //Audit 2-22-2025; Todo(mk): damage does not need to be allocated for 50000.0, however many mods call an arbituary number and these need audited in order to lower this value to a reasonable number. Note: Damage gets normalized, which used to be int. Therefore we can get away with using 16 bits on the float which should return n.xyz 
 	
 	//ScriptRemote_RegisterClientFunction( "ServerCallback_ScreenShake", "float", 0.0, 20.0, "float", 0.001, 255.0, 16, "vector", -32000.0, 32000, 32 )  //Audit 2-22-2025 , not currently called.
 	//ScriptRemote_RegisterClientFunction( "ServerCallback_UpdateOverheadIconForNPC", "int", EHANDLE_MIN, EHANDLE_MAX )//Audit 2-22-2025 not currently used
@@ -1102,13 +1102,13 @@ void function RemoteFunctions_Init_Begin()
 		// Localized Msg functions
 		int localizedStringsMax = GetLocalizedStringsCount() + 1
 		ScriptRemote_RegisterUntypedFunction_deprecated( "FS_BuildLocalizedMultiVarString" )
-		ScriptRemote_RegisterClientFunction( "FS_ShowLocalizedMultiVarMessage", "int", 0, localizedStringsMax, "int", 0, eMsgUI.len() + 1, "float", 0.0, 5000.0, 16 ) //Audit 2-22-2025
+		ScriptRemote_RegisterClientFunction( "FS_ShowLocalizedMultiVarMessage", "int", 0, localizedStringsMax, "int", 0, eMsgUI.len() + 1, "float", 0.0, 5000.0, 32 ) //Audit 2-22-2025
 		ScriptRemote_RegisterUntypedFunction_deprecated( "FS_BuildLocalizedTokenWithVariableString" ) //only for variable string
 		ScriptRemote_RegisterClientFunction( "FS_DisplayLocalizedToken", "int", 0, localizedStringsMax, "int", 0, localizedStringsMax, "int", 0, eMsgUI.len() + 1, "float", 0.0, FLT_MAX, 32 )
 
 		// Localized TextPanel
 		ScriptRemote_RegisterUntypedFunction_deprecated( "FS_BuildLocalizedVariable_InfoPanel" )
-		ScriptRemote_RegisterClientFunction( "FS_CreateTextInfoPanelWithID_Localized", "int", 0, localizedStringsMax, "int", 0, localizedStringsMax, "vector", -32000.0, 32000.0, 32, "vector", -32000.0, 32000.0, 32, "float", 0.0, 100.0, 16, "int", -1, 999 ) //Audit 2-22-2025
+		ScriptRemote_RegisterClientFunction( "FS_CreateTextInfoPanelWithID_Localized", "int", 0, localizedStringsMax, "int", 0, localizedStringsMax, "vector", -32000.0, 32000.0, 32, "vector", -32000.0, 32000.0, 32, "float", 0.0, 100.0, 32, "int", -1, 999 ) //Audit 2-22-2025
 	
 		// This will be moved to code. ( server issued muting )
 		ScriptRemote_RegisterClientFunction( "FS_Toggle_Mute", "bool" )
@@ -1135,15 +1135,15 @@ void function RemoteFunctions_Init_Begin()
 	ScriptRegisterNetworkedVariable( "stats_loaded", SNDC_PLAYER_GLOBAL, SNVT_BOOL, false )
 
 	
-	if( BannerAssets_IsEnabled() )
+	if( WorldAssets_IsEnabled() )
 	{
 		ScriptRemote_RegisterUntypedFunction_deprecated( "__BuildWorldAssetString" ) //optional, else called by int ref (should be deprecated feature of server asset system)
 		
 		//(mk): Temporarily moved some to deprecated to save room for typed buffer. 
-		ScriptRemote_RegisterClientFunction( "ServerCallback_CreateWorldAsset", "vector", -32000.0, 32000.0, 32, "vector", -32000.0, 32000.0, 32, "float", -1.0, 9999.0, 16, "float", -1.0, 9999.0, 16, "int", -1, 999, "int", -1, 999, "int", -1, 999, "float", -1.0, 1.0, 16, "bool", "float", -1.0, 5000.0, 16 )
+		ScriptRemote_RegisterClientFunction( "ServerCallback_CreateWorldAsset", "vector", -32000.0, 32000.0, 32, "vector", -32000.0, 32000.0, 32, "float", -1.0, 9999.0, 32, "float", -1.0, 9999.0, 32, "int", -1, 999, "int", -1, 999, "int", -1, 999, "float", -1.0, 1.0, 32, "bool", "float", -1.0, 5000.0, 32 )
 		//ScriptRemote_RegisterClientFunction( "ServerCallback_DestroyWorldAsset", "int", -2, 999 )
 		//ScriptRemote_RegisterClientFunction( "ServerCallback_SetWorldAssetVisibility", "int", 0, 999, "int", 0, 999, "bool", "bool", "bool", "int", -2, 999, "int", -5, 3, "bool" )
-		ScriptRemote_RegisterClientFunction( "ServerCallback_ModifyWorldAsset", "int", -2, 999, "int", -2, 999, "vector", -32000.0, 32000.0, 32, "vector",  -32000.0, 32000.0, 32, "float", -1.0, 9999.0, 16, "float", -1.0, 9999.0, 16, "float", -1.0, 1.0, 16, "int", -1, 999 )
+		ScriptRemote_RegisterClientFunction( "ServerCallback_ModifyWorldAsset", "int", -2, 999, "int", -2, 999, "vector", -32000.0, 32000.0, 32, "vector",  -32000.0, 32000.0, 32, "float", -1.0, 9999.0, 32, "float", -1.0, 9999.0, 32, "float", -1.0, 1.0, 32, "int", -1, 999 )
 		//ScriptRemote_RegisterClientFunction( "ServerCallback_CreateChannel", "int", -1, 30 )
 
 		//ScriptRemote_RegisterUntypedFunction_deprecated( "ServerCallback_CreateWorldAsset" )
@@ -1164,7 +1164,7 @@ void function RemoteFunctions_Init_Begin()
 	
 	RegisterServerVar( "tracker_enabled", false )
 	RegisterServerVar( "batch_fetch_complete", false )
-	ScriptRemote_RegisterUIFunction( "UI_Callback_MOTD" )
+	ScriptRemote_RegisterUIFunction( "UI_Callback_MOTD", "bool" )
 
 	if ( IsLobby() )
 	{

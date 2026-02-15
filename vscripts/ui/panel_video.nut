@@ -71,11 +71,11 @@ void function InitVideoPanel( var panel )
 
 		button = Hud_GetChild( file.videoPanel, "SldFpsMax" )
 		SetupSettingsSlider( button, "#FS_FPS_MAX", "#FS_MAX_FPS_DESC", $"rui/menu/settings/settings_video" )
-		//AddButtonEventHandler( button, UIE_CHANGE, FpsMax_Changed )
+		AddButtonEventHandler( button, UIE_CHANGE, FpsMax_Changed )
 		file.noApplyConfirmationRequired.append( button )
 		
 		button = Hud_GetChild( file.videoPanel, "TextEntrySldFpsMax" )
-		//AddButtonEventHandler( button, UIE_CHANGE, FpsMax_Changed )
+		AddButtonEventHandler( button, UIE_CHANGE, FpsMax_Changed )
 		file.noApplyConfirmationRequired.append( button )
 
 		button = Hud_GetChild( file.videoPanel, "SldAdaptiveRes" )
@@ -98,7 +98,7 @@ void function InitVideoPanel( var panel )
 		SetupSettingsSlider( button, "#FOV", "#ADVANCED_VIDEO_MENU_FOV_DESC", $"rui/menu/settings/settings_video" )
 		AddButtonEventHandler( button, UIE_CHANGE, FOV_Changed )
 		AddButtonEventHandler( Hud_GetChild( file.videoPanel, "TextEntrySldFOV" ), UIE_CHANGE, FOVTextEntry_Changed )
-		file.noApplyConfirmationRequired.append( button )
+		//file.noApplyConfirmationRequired.append( button )
 
 		SetupSettingsButton( Hud_GetChild( file.videoPanel, "SwchResolution" ), "#RESOLUTION", "#ADVANCED_VIDEO_MENU_RESOLUTION_DESC", $"rui/menu/settings/settings_video" )
 		AddButtonEventHandler( Hud_GetChild( file.videoPanel, "SwchResolution" ), UIE_CHANGE, ResolutionSelection_Changed )
@@ -228,6 +228,9 @@ void function AdvancedVideoButton_Changed( var button )
 {
 	// handle "colorblind_mode" being changed from accessibilty section of gameplay tab
 	if ( !IsTabPanelActive( file.panel ) )
+		return
+
+	if( file.noApplyConfirmationRequired.contains( button ) )
 		return
 
 	uiGlobal.videoSettingsChanged = true
@@ -435,4 +438,11 @@ void function FooterButton_Focused( var button )
 {
 	//var label = Hud_GetChild( file.panel, "LblMenuItemDescription" )
 	//Hud_SetText( label, "" )
+}
+
+void function FpsMax_Changed( var button )
+{
+	int fpsMax = GetConVarInt( "fps_max" )
+	if( fpsMax > 0 && fpsMax < 30 )
+		SetConVarInt( "fps_max", 30 )	
 }

@@ -510,7 +510,7 @@ void function TakeLoadoutRelatedWeapons( entity player )
 
 void function GiveLoadoutRelatedWeapons( entity player )
 {
-	TakeLoadoutRelatedWeapons(player)
+	TakeLoadoutRelatedWeapons(player) //(mk): This takes melee, but it's not given back here.
 	
 	ItemFlavor character = LoadoutSlot_GetItemFlavor( ToEHI( player ), Loadout_CharacterClass() )
 	ItemFlavor tactical = CharacterClass_GetTacticalAbility( character )
@@ -630,7 +630,7 @@ void function DecideRespawnPlayer( entity player, bool giveLoadoutWeapons = true
 	asset characterSetFile = CharacterClass_GetSetFile( playerCharacter )
 	player.SetPlayerSettingsWithMods( characterSetFile, enabledMods )
 
-	// Already executed in CodeCallback_OnPlayerRespawned
+	// (mk): Already executed in CodeCallback_OnPlayerRespawned
 	// Remote_CallFunction_NonReplay( player, "ServerCallback_YouRespawned" )
 
 	PlayerStopSpectating( player )
@@ -652,22 +652,27 @@ void function DecideRespawnPlayer( entity player, bool giveLoadoutWeapons = true
 
 	UpdatePlayerCounts()
 	
-	if( Gamemode() == eGamemodes.map_editor_deprecated ) //todo move to mode specific callback
-		thread (void function() : ( player )
-		{
-			if(IsValid(player.GetOffhandWeapon( OFFHAND_TACTICAL )))
+	if( Gamemode() == eGamemodes.map_editor_deprecated ) //(mk): todo move to mode specific callback
+	{
+		thread
+		( 
+			void function() : ( player )
 			{
-				player.TakeOffhandWeapon( OFFHAND_TACTICAL )
-				player.GiveOffhandWeapon( "mp_weapon_editor", OFFHAND_TACTICAL, [] )
-				player.SetActiveWeaponByName( eActiveInventorySlot.mainHand, "mp_weapon_editor" )
+				if( IsValid( player.GetOffhandWeapon( OFFHAND_TACTICAL ) ) )
+				{
+					player.TakeOffhandWeapon( OFFHAND_TACTICAL )
+					player.GiveOffhandWeapon( "mp_weapon_editor", OFFHAND_TACTICAL, [] )
+					player.SetActiveWeaponByName( eActiveInventorySlot.mainHand, "mp_weapon_editor" )
+				}
+				if( IsValid( player.GetOffhandWeapon( OFFHAND_ULTIMATE ) ) )
+					player.TakeOffhandWeapon( OFFHAND_ULTIMATE )
+				
+				wait 1
+				Message( player, "PROP DYNAMIC MAP EDITOR", "Made by Sal, Fireproof, Pebbers & JustANormalUser. Misc fixes by CaféFPS.", 8 )
 			}
-			if(IsValid(player.GetOffhandWeapon( OFFHAND_ULTIMATE )))
-				player.TakeOffhandWeapon( OFFHAND_ULTIMATE )
-			
-			wait 1
-			Message(player, "PROP DYNAMIC MAP EDITOR", "Made by Sal, Fireproof, Pebbers & JustANormalUser. Misc fixes by CaféFPS.", 8)
-		})()
-		
+		)()
+	}
+	
 	if( player.IsThirdPersonShoulderModeOn() )
 		player.SetThirdPersonShoulderModeOn() // If you respawn in third person, it will automatically revert to first person, so turn it on again
 

@@ -41,9 +41,9 @@ global function GetLocalizedStringsCount
 	#endif 
 #endif
 
-	const ASSERT_LOCALIZATION = false
-	const DEBUG_VARMSG = false
-	const MAX_CHAR_PER_CALL = 8
+	const bool ASSERT_LOCALIZATION = false
+	const bool DEBUG_VARMSG = false
+	const int MAX_CHAR_PER_CALL = 8
 
 global enum eMsgUI
 {
@@ -61,29 +61,32 @@ global enum eMsgUI
 	VAR_SUBTEXT_SLOT, 	//11
 	VAR_EVENT, 			//12
 	VAR_MOTD, 			//13
-	IBMM 				//14
+	IBMM, 				//14
+	NOTIFICATION		//15
 }
 
 struct 
 {
-	table<int, string> FS_LocalizedStrings = {}
+	table<int, string> FS_LocalizedStrings
 	int iConsistencyCheck = -1
 	
 #if SERVER
-	table<string, int> FS_LocalizedStringMap = {}
+	table<string, int> FS_LocalizedStringMap
 #endif
 
 #if CLIENT
-	string fs_variableString = ""
-	string fs_variableSubString = ""
-	string fs_variableString_InfoPanel = ""
-	string fs_variableSubString_InfoPanel = ""
+	string fs_variableString
+	string fs_variableSubString
+	string fs_variableString_InfoPanel
+	string fs_variableSubString_InfoPanel
 	
-	string motd_text = ""
-	string motd_text2 = ""
+	string motd_text
+	string motd_text2
 	
-	array<string> variableVars = []
-	bool bConsistencyCheckComplete = false
+	array<string> variableVars
+	bool bConsistencyCheckComplete
+	bool bDisableDefaultMessageSounds
+	bool bMsgUINotificationClosesMenus
 #endif
 
 	//////////////////////////////////////////////////////////////////////////
@@ -436,14 +439,18 @@ struct
 		"#DEV_ONLY",
 		"#BADGE_SAVED",
 		
-		/* 4/8/2025 */
+		/* (mk): 4/8/2025 */
 		
-		"#FS_STATS_NOT_READY"
+		"#FS_STATS_NOT_READY",
 		
-		/* 1/5/2025 */
+		/* (mk): 1/5/2025 */
 		
-		"#FS_TIMEOUT"
-		"#FS_UNTIMEOUT"
+		"#FS_TIMEOUT",
+		"#FS_UNTIMEOUT",
+		
+		/* (mk): 2/12/2026 */
+		
+		"#UNREGISTERED_HEIRLOOOM"
 	]
 	
 } file
@@ -477,6 +484,11 @@ void function INIT_Flowstate_Localization_Strings()
 			file.FS_LocalizedStringMap[ file.allRegisteredTokens[ i ] ] <- i
 		#endif
 	}
+	
+	#if CLIENT 
+		file.bDisableDefaultMessageSounds		= GetCurrentPlaylistVarBool( "disable_message_sounds", false )
+		file.bMsgUINotificationClosesMenus		= GetCurrentPlaylistVarBool( "eMsgUI_notification_closes_menus", true )
+	#endif
 	
 	file.allRegisteredTokens.clear()
 	
@@ -999,10 +1011,19 @@ void function FS_DisplayLocalizedToken( int token, int subtoken, int uiType, flo
 
 	switch( uiType )
 	{
-		case eMsgUI.DEFAULT: DisplayMessage( Msg, SubMsg, duration ); break
-		case eMsgUI.EVENT: Flowstate_AddCustomScoreEventMessage(  Msg, duration ); break
-		// > 2 is handled by enum: eMsgUI and DisplayMessage()
+		case eMsgUI.EVENT: 
+			Flowstate_AddCustomScoreEventMessage( Msg, duration )
+			break
+			
+		case eMsgUI.NOTIFICATION: 
 		
+			if( file.bMsgUINotificationClosesMenus )
+				RunUIScript( "CloseAllMenus" )
+				
+			UIToClient_Notification( Msg, SubMsg, duration )
+			break
+		
+		// all others handled by DisplayMessage()
 		default:
 			DisplayMessage( Msg, SubMsg, duration, uiType ); break
 	}
@@ -1029,12 +1050,15 @@ void function DisplayMessage( string str1, string str2, float duration, int uiTy
 	Announcement_SetHideOnDeath( announcement, false )
 	Announcement_SetDuration( announcement, duration )
 	Announcement_SetPurge( announcement, true )
-	//Announcement_SetSoundAlias( announcement, "" )
+	
+	if( file.bDisableDefaultMessageSounds )
+		Announcement_SetSoundAlias( announcement, "" )
+	
 	//Announcement_SetLeftText( announcement, ["test","test","test"] )
 	//Announcement_SetRightText( announcement, ["test","test","test"] )
 	
 	//set default 
-	Announcement_SetStyle(announcement, ANNOUNCEMENT_STYLE_CIRCLE_WARNING)
+	Announcement_SetStyle( announcement, ANNOUNCEMENT_STYLE_CIRCLE_WARNING )
 
 	int mode = Gamemode()
 	

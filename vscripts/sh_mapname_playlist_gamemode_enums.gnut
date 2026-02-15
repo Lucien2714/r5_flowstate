@@ -1,3 +1,4 @@
+//Todo: This legacy temp system should be revisited
 //script init:																												//mkos
 global function PlayLists_Mapnames_Gamemodes_Init
 
@@ -19,6 +20,8 @@ global function PrintRegisteredPlaylists
 
 #if DEVELOPER 
 	global function DEV_CheckPlaylistRegistration
+	global function DEV_PrintPlaylistsWithNames
+	global function DEV_PrintGamemodesWithNames
 #endif
 
 //mode functions:
@@ -137,7 +140,7 @@ global enum ePlaylists
 global enum eGamemodes
 {
 	MENUFALL, //0
-	TEAM_DEATHMATCH, //1
+	tdm, //TEAM_DEATHMATCH, //1
 	SURVIVAL, //2
 	FREELANCE, //3
 	CUSTOM_CTF, //4
@@ -155,14 +158,6 @@ global enum eGamemodes
 	
 	_GAMEMODES_COUNT //LAST
 }
-
-global const array G_REGISTER_1V1_NETVARS_FOR_PLAYLIST = 
-[
-	ePlaylists.fs_1v1,
-	ePlaylists.fs_vamp_1v1,
-	ePlaylists.fs_1v1_headshots_only,
-	ePlaylists.fs_lgduels_1v1
-]
 
 struct
 {
@@ -449,6 +444,47 @@ void function _printstringarray( array<string> arr, string title = "???" )
 		else 
 			printl( "All registered playlists in global enum ePlaylists are configured in playlists_r5_patch.txt" )
 	}
+	
+	void function DEV_PrintPlaylistsWithNames()
+	{
+		string printText
+		string playlistName 
+		
+		array< string > playlists = GetAllPlaylists()
+		foreach( string playlistCodeName in playlists )
+		{
+			playlistName = GetPlaylistVarString( playlistCodeName, "name", "no_name" )
+			
+			#if CLIENT || UI
+				playlistName = Localize( playlistName )
+			#endif 
+			
+			printText += format( "| `%s`   | %s       |\n", playlistCodeName, playlistName )
+		}
+	
+		printl( printText )
+	}
+	
+	void function DEV_PrintGamemodesWithNames()
+	{	
+		string printText
+		string gamemodeName 
+		
+		table< string, GamemodeSettings > gameModes = GameMode_GetAllGamemodeData()
+		
+		foreach( string gamemodeCodeName, GamemodeSettings data in gameModes )
+		{
+			gamemodeName = data.name_localized
+			
+			#if CLIENT || UI
+				gamemodeName = Localize( gamemodeName )
+			#endif
+			
+			printText += format( "| `%s`   | %s       |\n", gamemodeCodeName, gamemodeName )
+		}
+	
+		printl( printText )
+	}
 #endif 
 
 //////////////////////////////////////////
@@ -513,7 +549,8 @@ void function PassivesAllowed_Init()
 		ePlaylists.survival_duos,
 		ePlaylists.survival,
 		ePlaylists.fs_rankupmapmovementpractice,
-		ePlaylists.fs_realistic_ttv
+		ePlaylists.fs_realistic_ttv,
+		ePlaylists.fs_grapples_n_guns
 	]
 
 	bool result = ( allowedPassiveGamemodes.contains( Gamemode() ) && allowedPassivePlaylists.contains( Playlist() ) )
@@ -558,6 +595,7 @@ void function TrackerSupportedMode_Init()
 		ePlaylists.fs_dm_fast_instagib,
 		ePlaylists.fs_snd,
 		ePlaylists.fs_realistic_ttv
+		ePlaylists.fs_grapples_n_guns
 		//ePlaylists.survival_duos,
 		//ePlaylists.survival_trios,
 	]

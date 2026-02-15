@@ -1,4 +1,17 @@
 global function MOTD_Init
+global function AdminCommandOpenMOTD
+
+void function MOTD_Init()
+{
+    if ( GetCurrentPlaylistVarBool( "enable_motd", false ) )
+    {
+		#if DEVELOPER
+			printl( "AddCallback_OnClientConnected( FireRemoteMotd )" )
+		#endif
+		
+        AddCallback_OnClientConnected( FireRemoteMotd )
+    }
+}
 
 void function FireRemoteMotd( entity player )
 {	
@@ -15,19 +28,18 @@ void function FireRemoteMotd( entity player )
 			// WaitForChampionToFinish()
 			
 			if ( IsValid( player ) && player.p.isConnected )		
-				Remote_CallFunction_UI( player, "UI_Callback_MOTD" )
+				Remote_CallFunction_UI( player, "UI_Callback_MOTD", false )
 		}
 	)()
 }
 
-void function MOTD_Init()
+bool function AdminCommandOpenMOTD( entity player )
 {
-    if ( GetCurrentPlaylistVarBool( "enable_motd", false ) )
-    {
-		#if DEVELOPER
-			printl( "AddCallback_OnClientConnected( FireRemoteMotd )" )
-		#endif
+	if( !IsValid( player ) || !player.p.isConnected )
+		return false
 		
-        AddCallback_OnClientConnected( FireRemoteMotd )
-    }
+	Remote_CallFunction_UI( player, "UI_Callback_MOTD", true ) //(mk): still respects player's settings and wont show if they have it disabled	
+	SendResponse( player, "An admin has sent the motd for you to review", true )
+	
+	return true
 }

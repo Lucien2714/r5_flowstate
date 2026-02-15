@@ -72,6 +72,7 @@ global function HaloMod_HandlePlayerModel
 global function EndRound
 global function PrimaryWeaponMetagame_Init
 global function FS_GiveRandomMelee
+global function IsHeirloomRegistered
 #if DEVELOPER
 	global function DEV_NextRound
 #endif
@@ -79,7 +80,8 @@ global function FS_GiveRandomMelee
 //Beginning of refactor( supposed to be for next, next release.. )
 global function AddCallback_OnTdmStateEnter_InProgress
 global function AddCallback_OnTdmStateEnter_EndGame
-global function AddFSCallback_ShouldTimerEnd
+global function SetFSCallback_ShouldTimerEnd
+global function AddFSCallback_OnRespawned
 
 global function Message_New //deprecated, use LocalEventMsg() ~mkos
 global function ServerMsgToBox //not used
@@ -124,6 +126,7 @@ global struct Heirloom
 {
 	string melee
 	string primary
+	int id
 }
 
 struct 
@@ -171,6 +174,8 @@ struct
 	
 	array< void functionref() > tdmStateInProgressCallbacks
 	array< void functionref() > tdmStateEndGameCallbacks
+	array< void functionref( entity ) > flowstateOnRespawnedCallbacks
+	
 	bool bIsChampionShowing
 	table<string, LocationSettings> locationSettingsMap = {}
 	
@@ -183,6 +188,7 @@ struct
 	array<ItemFlavor> characters
 	
 	bool functionref( int ) ShouldTimerEnd = null
+	int __communityHeirloomRegisterID = 0
 
 } file
 
@@ -236,6 +242,8 @@ struct
 	bool bIs1v1ModeEnabled
 	bool show_short_champion_screen
 	bool bIsRealisticMode
+	bool bEnableHelmets
+	bool flowstate_givecharms_weapons
 	
 	//string settings 
 	string custom_match_ending_title
@@ -298,14 +306,22 @@ void function InitializePlaylistSettings()
 	flowstateSettings.show_short_champion_screen			= GetCurrentPlaylistVarBool( "show_short_champion_screen", true )
 	flowstateSettings.bIsRealisticMode 						= Playlist() == ePlaylists.fs_realistic_ttv
 	flowstateSettings.give_weapon_stack_count_amount		= GetCurrentPlaylistVarInt( "give_weapon_stack_count_amount", 0 )
+	flowstateSettings.bEnableHelmets						= GetCurrentPlaylistVarBool( "enable_helmets", false )
+	flowstateSettings.flowstate_givecharms_weapons			= GetCurrentPlaylistVarBool( "flowstate_givecharms_weapons", false )
 }
 
-void function AddFSCallback_ShouldTimerEnd( bool functionref( int ) callbackFunc )
+void function SetFSCallback_ShouldTimerEnd( bool functionref( int ) callbackFunc )
 {
 	if( file.ShouldTimerEnd != null )
 		mAssert( 0, "Tried to add callback %s with %s but it was already set as %s", string( callbackFunc ), FUNC_NAME(), string( file.ShouldTimerEnd ) )
 
 	file.ShouldTimerEnd = callbackFunc
+}
+
+void function AddFSCallback_OnRespawned( void functionref( entity ) callbackFunc )
+{
+	mAssert( !file.flowstateOnRespawnedCallbacks.contains( callbackFunc ), "Tried to add callbackfunc %s() with AddFSCallback_OnRespawned more than once", string( callbackFunc ) )
+	file.flowstateOnRespawnedCallbacks.append( callbackFunc )
 }
 
 bool function Flowstate_IsRealisticMode()
@@ -355,6 +371,7 @@ void function _CustomTDM_Init()
 	RegisterSignal( "EndScriptedPropsThread" )
 	RegisterSignal( "FS_WaitForBlackScreen" )
 	RegisterSignal( "FS_ForceDestroyAllLifts" )
+	RegisterSignal( "FSOnRespawned" )
 	
 	if( FlowState_RandomGunsMetagame() )
 	{
@@ -385,10 +402,10 @@ void function _CustomTDM_Init()
 	
 	if( !is1v1EnabledAndAllowed() && Playlist() != ePlaylists.fs_scenarios )
 	{
-			PrecacheCustomMapsProps()
-			de_NCanals_precache()
-			PrecacheZeesMapProps()
-			PrecacheDEAFPSMapProps()
+		PrecacheCustomMapsProps()
+		de_NCanals_precache()
+		PrecacheZeesMapProps()
+		PrecacheDEAFPSMapProps()
 	}
 	
 	if( flowstateSettings.is_halo_gamemode )
@@ -425,8 +442,10 @@ void function _CustomTDM_Init()
 
     __InitAdmins()
 
+	if( Playlist() == ePlaylists.fs_grapples_n_guns ) //init before callbacks
+		GrapplesNGunsInit()
+
     AddCallback_EntitiesDidLoad( DM__OnEntitiesDidLoad )
-	
 
     AddCallback_OnClientConnected( void function(entity player) {
         if (FlowState_SURF())
@@ -527,8 +546,17 @@ void function _CustomTDM_Init()
 	if( is1v1EnabledAndAllowed() )
 		Gamemode1v1_Init( MapName() )
 		
-	if( Playlist() == ePlaylists.fs_grapples_n_guns )
-		GrapplesNGunsInit()
+	if( flowstateSettings.hackersVsPros )
+		SetFSCallback_ShouldTimerEnd( HackerVsProsTimerFunc )
+
+	if( flowstateSettings.enable_oddball_gamemode )
+	{
+		SetFSCallback_ShouldTimerEnd( HaloOddballTimerFunc )
+		AddCallback_OnTdmStateEnter_EndGame( OnRoundEndOddball )
+	}
+		
+	if( flowstateSettings.is_halo_gamemode )
+		SetFSCallback_ShouldTimerEnd( HaloPlayAnnounce )
 }
 
 void function __OnEntitiesDidLoadCTF()
@@ -1270,8 +1298,7 @@ void function _OnPlayerDied( entity victim, entity attacker, var damageInfo )
 						decidedWaitTime = STATIC_WAIT_TIME
 				}
 					
-				if( Playlist() != ePlaylists.fs_realistic_ttv )
-					Remote_CallFunction_ByRef( victim, "ForceScoreboardLoseFocus" )
+				Remote_CallFunction_ByRef( victim, "ForceScoreboardLoseFocus" )
 				
 				//(mk): I originally intended this to be apart of a lifestate change or YouDied callback, and setting UpdateNextRespawnTime( entity player, float time ), client using: GetNextRespawnTime( player )  but due to various mode behavior, it's better left as a remote func call.
 				Remote_CallFunction_Replay( victim, "Flowstate_ShowRespawnTimeUI", int( DEATHCAM_TIME_SHORT + decidedWaitTime ) )//+ DEATHCAM_TIME_SHORT ) )
@@ -1470,24 +1497,28 @@ void function PlayerKillStreakAnnounce( entity attacker, string doubleKill, stri
 
 void function CheckForObservedTarget(entity player)
 {
-	OnThreadEnd(
+	OnThreadEnd
+	(
 		function() : ( player )
 		{
-			if( !IsValid(player) ) return
+			if( !IsValid( player ) ) 
+				return
 			
-			if(IsValid(player.p.lastFrameObservedTarget))
+			if( IsValid( player.p.lastFrameObservedTarget ) )
 			{
-				player.p.lastFrameObservedTarget.SetPlayerNetInt( "playerObservedCount", max(0, player.p.lastFrameObservedTarget.GetPlayerNetInt( "playerObservedCount" ) - 1) )
+				player.p.lastFrameObservedTarget.SetPlayerNetInt( "playerObservedCount", max( 0, player.p.lastFrameObservedTarget.GetPlayerNetInt( "playerObservedCount" ) - 1 ) )
 				player.p.lastFrameObservedTarget = null
 			}
 			
-			if(!IsValid( player.GetObserverTarget() ) && GetGameState() == eGameState.Playing )
+			if( !IsValid( player.GetObserverTarget() ) && GetGameState() == eGameState.Playing )
 			{
 				player.p.isSpectating = false
 				player.SetPlayerNetInt( "spectatorTargetCount", 0 )
 				player.SetSpecReplayDelay( 0 )
 				player.SetObserverTarget( null )
 				player.StopObserverMode()
+				
+				Remote_CallFunction_ByRef( player, "ServerCallback_KillReplayHud_Deactivate" )
 				player.p.lastTimeSpectateUsed = Time()
 				_HandleRespawn( player )
 			}
@@ -1495,17 +1526,18 @@ void function CheckForObservedTarget(entity player)
 	)
 	
 	entity observerTarget
-	while(IsValid(player) && player.IsObserver() && IsValid( player.GetObserverTarget() ) )
+	while( IsValid( player ) && player.IsObserver() && IsValid( player.GetObserverTarget() ) )
 	{		
 		observerTarget = player.GetObserverTarget()
-		if(observerTarget != player.p.lastFrameObservedTarget)
+		if( observerTarget != player.p.lastFrameObservedTarget )
 		{
-			if(IsValid(player.p.lastFrameObservedTarget))
-				player.p.lastFrameObservedTarget.SetPlayerNetInt( "playerObservedCount", max(0, player.p.lastFrameObservedTarget.GetPlayerNetInt( "playerObservedCount" ) - 1) )
+			if( IsValid( player.p.lastFrameObservedTarget ) )
+				player.p.lastFrameObservedTarget.SetPlayerNetInt( "playerObservedCount", max(0, player.p.lastFrameObservedTarget.GetPlayerNetInt( "playerObservedCount" ) - 1 ) )
 			
-			if(IsValid(observerTarget))
+			if( IsValid( observerTarget ) )
 				observerTarget.SetPlayerNetInt( "playerObservedCount", observerTarget.GetPlayerNetInt( "playerObservedCount" ) + 1 )
 		}
+		
 		player.p.lastFrameObservedTarget = player.GetObserverTarget()
 		WaitFrame()
 	}
@@ -1524,10 +1556,11 @@ void function _HandleRespawn( entity player, bool isDroppodSpawn = false )
     {
 		player.SetSpecReplayDelay( 0 )
 		player.SetObserverTarget( null )
-		player.StopObserverMode()
+		player.StopObserverMode()	
+		
         Remote_CallFunction_ByRef( player, "ServerCallback_KillReplayHud_Deactivate" )
     }
-
+	
 	if( MapName() == eMaps.mp_rr_arena_empty )
 		Remote_CallFunction_ByRef( player, "Minimap_DisableDraw_Internal" )
 	else
@@ -1822,6 +1855,9 @@ void function _HandleRespawn( entity player, bool isDroppodSpawn = false )
 
 	thread function () : ( player )
 	{
+		if( !IsValid( player ) ) //(mk): threaded off.
+			return
+	
 		EndSignal( player, "OnDestroy" )
 		
 		if( !flowstateSettings.is_halo_gamemode && !Flowstate_IsFastInstaGib() )
@@ -1869,6 +1905,11 @@ void function _HandleRespawn( entity player, bool isDroppodSpawn = false )
 			
 		// if( is1v1EnabledAndAllowed() ) //(mk): handle respawn is only fired for newjoins in 1v1 type gamemodes.
 			// Gamemode1v1_TakeAll( player )
+			
+		foreach( callbackFunc in file.flowstateOnRespawnedCallbacks )
+			callbackFunc( player )
+			
+		player.Signal( "FSOnRespawned" )
 	}()
 	// #if DEVELOPER
 		// printt( "End of _HandleRespawn function" )//Cafe debugging halo mod stuff
@@ -1950,7 +1991,10 @@ void function TpPlayerToSpawnPoint(entity player)
 
 void function Flowstate_GrantSpawnImmunity(entity player, float duration)
 {
-	if(!IsValid(player) || !player.IsPlayer() || is1v1EnabledAndAllowed() ) return
+	if(!IsValid(player) || !player.IsPlayer() || is1v1EnabledAndAllowed() ) 
+		return
+	
+	player.EndSignal( "OnDestroy" )
 	
 	EmitSoundOnEntityOnlyToPlayer( player, player, "PhaseGate_Enter_1p" )
 	EmitSoundOnEntityExceptToPlayer( player, player, "PhaseGate_Enter_3p" )
@@ -1969,8 +2013,6 @@ void function Flowstate_GrantSpawnImmunity(entity player, float duration)
 	
 	while(Time() <= endTime)
 		wait 0.1
-	
-	if ( !IsValid( player ) ) return
 	
 	player.MakeVisible()
 	player.ClearInvulnerable()
@@ -1997,47 +2039,61 @@ void function Flowstate_GrantSpawnImmunity(entity player, float duration)
 	//maki script
 }
 
-void function WpnPulloutOnRespawn(entity player, float duration)
+const array<string> FS_CHARMS_TO_USE = 
+[ 
+	"SAID00701640565", 
+	"SAID01451752993", 
+	"SAID01334887835", 
+	"SAID01993399691", 
+	"SAID00095078608", 
+	"SAID01439033541", 
+	"SAID00510535756", 
+	"SAID00985605729" 
+]
+void function WpnPulloutOnRespawn( entity player, float duration )
 {
-	if(!IsValid( player ) || !IsAlive(player) ) return
+	if( !IsValid( player ) || !IsAlive( player ) ) 
+		return
 	
 	player.ClearFirstDeployForAllWeapons()
 	if( flowstateSettings.ReloadTacticalOnRespawn )
 	{
 		entity tactical = player.GetOffhandWeapon( OFFHAND_TACTICAL )
 		//maki script
-		if ( !IsValid( tactical ) ) return
+		if ( !IsValid( tactical ) ) 
+			return
+			
 		tactical.SetWeaponPrimaryClipCount( tactical.GetWeaponPrimaryClipCountMax() )
 	}
+	
 	if( flowstateSettings.ReloadUltimateOnRespawn )
 	{
 		entity ultimate = player.GetOffhandWeapon( OFFHAND_ULTIMATE )
 		//maki script
 		if ( !IsValid( ultimate ) ) return
 		ultimate.SetWeaponPrimaryClipCount( ultimate.GetWeaponPrimaryClipCountMax() )
-	}
+	}	
 	
-	array<string> fsCharmsToUse = [ "SAID00701640565", "SAID01451752993", "SAID01334887835", "SAID01993399691", "SAID00095078608", "SAID01439033541", "SAID00510535756", "SAID00985605729" ]
-	
-	if(IsValid( player.GetNormalWeapon( WEAPON_INVENTORY_SLOT_PRIMARY_1 )))
+	if( IsValid( player.GetNormalWeapon( WEAPON_INVENTORY_SLOT_PRIMARY_1 ) ) )
 	{
 		entity weapon = player.GetNormalWeapon( WEAPON_INVENTORY_SLOT_PRIMARY_1 )
 		
-		if( weapon.LookupAttachment( "CHARM" ) != 0 )
-			WeaponCosmetics_Apply( weapon, null, GetItemFlavorByGUID( ConvertItemFlavorGUIDStringToGUID( fsCharmsToUse.getrandom() ) ) )
+		if( flowstateSettings.flowstate_givecharms_weapons && weapon.LookupAttachment( "CHARM" ) != 0 )
+			WeaponCosmetics_Apply( weapon, null, GetItemFlavorByGUID( ConvertItemFlavorGUIDStringToGUID( FS_CHARMS_TO_USE.getrandom() ) ) )
 	}
-	if(IsValid( player.GetNormalWeapon( WEAPON_INVENTORY_SLOT_PRIMARY_0 )))
+	
+	if( IsValid( player.GetNormalWeapon( WEAPON_INVENTORY_SLOT_PRIMARY_0 ) ) )
 	{
 		entity weapon = player.GetNormalWeapon( WEAPON_INVENTORY_SLOT_PRIMARY_0 )
 		
-		if( weapon.LookupAttachment( "CHARM" ) != 0 )
-			WeaponCosmetics_Apply( weapon, null, GetItemFlavorByGUID( ConvertItemFlavorGUIDStringToGUID( fsCharmsToUse.getrandom() ) ) )
+		if( flowstateSettings.flowstate_givecharms_weapons && weapon.LookupAttachment( "CHARM" ) != 0 )
+			WeaponCosmetics_Apply( weapon, null, GetItemFlavorByGUID( ConvertItemFlavorGUIDStringToGUID( FS_CHARMS_TO_USE.getrandom() ) ) )
 			
-		player.SetActiveWeaponBySlot(eActiveInventorySlot.mainHand, WEAPON_INVENTORY_SLOT_PRIMARY_0)
+		player.SetActiveWeaponBySlot( eActiveInventorySlot.mainHand, WEAPON_INVENTORY_SLOT_PRIMARY_0 )
 	}
 	
-	player.SetActiveWeaponBySlot(eActiveInventorySlot.mainHand, WEAPON_INVENTORY_SLOT_PRIMARY_1)
-	player.SetActiveWeaponBySlot(eActiveInventorySlot.mainHand, WEAPON_INVENTORY_SLOT_PRIMARY_0)
+	player.SetActiveWeaponBySlot( eActiveInventorySlot.mainHand, WEAPON_INVENTORY_SLOT_PRIMARY_1 )
+	player.SetActiveWeaponBySlot( eActiveInventorySlot.mainHand, WEAPON_INVENTORY_SLOT_PRIMARY_0 )
 }
 
 void function WpnAutoReloadOnKill( entity player )
@@ -2125,7 +2181,7 @@ void function __GiveWeapon( entity player, array<string> WeaponData, int slot, i
 			ItemFlavor ornull weaponSkinOrNull = null
 			array<string> fsCharmsToUse = [ "SAID00701640565", "SAID01451752993", "SAID01334887835", "SAID01993399691", "SAID00095078608", "SAID01439033541", "SAID00510535756", "SAID00985605729" ]
 			int chosenCharm = ConvertItemFlavorGUIDStringToGUID( fsCharmsToUse.getrandom() )
-			ItemFlavor ornull weaponCharmOrNull = GetCurrentPlaylistVarBool( "flowstate_givecharms_weapons", false ) == true ? GetItemFlavorByGUID( chosenCharm ) : null
+			ItemFlavor ornull weaponCharmOrNull = flowstateSettings.flowstate_givecharms_weapons ? GetItemFlavorByGUID( chosenCharm ) : null
 			ItemFlavor ornull weaponFlavor = GetWeaponItemFlavorByClass( weaponclass )
 
 			if( weaponFlavor != null )
@@ -3063,7 +3119,16 @@ void function SimpleChampionUI()
 	}
 	else
 	{
-		file.selectedLocation = file.locationSettings[ FS_DM.mappicked ]
+		if( !file.locationSettings.len() )
+		{
+			#if DEVELOPER 
+				Warning( "No locations found in file.locationSettings, setting VOTING_PHASE_ENABLE to false" )
+			#endif
+			
+			VOTING_PHASE_ENABLE = false
+		}
+		else
+			file.selectedLocation = file.locationSettings[ FS_DM.mappicked ]
 	}
 
 	file.thisroundDroppodSpawns = GetNewFFADropShipLocations( file.selectedLocation.name, GetMapName() )
@@ -3626,9 +3691,7 @@ void function SimpleChampionUI()
 	g_fCurrentRoundEndTime = Time() + FlowState_RoundTime() //set global for server
 	
 	if( flowstateSettings.EndlessFFAorTDM )
-	{
 		WaitForever()
-	}
 
 	if ( FlowState_Timer() )
 	{
@@ -3666,67 +3729,13 @@ void function SimpleChampionUI()
 		////////////////////////////////
 		
 		bool hasTimerCallback = file.ShouldTimerEnd != null
-		while( Time() <= g_fCurrentRoundEndTime && file.tdmState == eTDMState.IN_PROGRESS ) //Todo(mk): Execute callbacks for gamemode and add via AddFSCallback_ShouldTimerEnd( int timeRemaining, bool functionref() condFunc ) //done
+		while( Time() <= g_fCurrentRoundEndTime && file.tdmState == eTDMState.IN_PROGRESS )
 		{
-			if( hasTimerCallback && file.ShouldTimerEnd( ( g_fCurrentRoundEndTime - Time() ).tointeger() ) )
+			//(mk): add via SetFSCallback_ShouldTimerEnd( int timeRemaining, bool functionref() condFunc )
+			if( hasTimerCallback && file.ShouldTimerEnd( floor( g_fCurrentRoundEndTime - Time() ).tointeger() ) )
 				break
-		
-			if( flowstateSettings.hackersVsPros )
-			{
-				foreach(player in GetPlayerArray())
-				{
-					if ( !IsValid( player ) ) continue
-					
-					if(player.GetPlayerGameStat( PGS_KILLS ) >= HACKERS_VS_PRO_MAX_KILLS )
-					{
-						SetTdmStateToNextRound()
-						break
-					}
-				}
-			}
-
-			if( flowstateSettings.enable_oddball_gamemode )
-			{
-				table< int,int > totalTeamsScore
-				
-				foreach(player in GetPlayerArray())
-				{
-					if ( !IsValid( player ) ) continue
-
-					if( !( player.GetTeam() in totalTeamsScore ) )
-					{
-						totalTeamsScore[ player.GetTeam() ] <- player.GetPlayerNetInt( "oddball_ballHeldTime" )
-					} else
-					{
-						totalTeamsScore[ player.GetTeam() ] += player.GetPlayerNetInt( "oddball_ballHeldTime" )
-					}
-				}
-
-				foreach( team, score in totalTeamsScore )
-				{
-					if( score >= ODDBALL_POINTS_TO_WIN )
-					{
-						//set team as winner, show ui screen
-						if( flowstateSettings.enable_oddball_gamemode && IsValid( GetBallCarrier() ) && IsAlive( GetBallCarrier() ) )
-						{
-							ClearBallCarrierPlayerSetup( GetBallCarrier() )
-							SetEmptyBallInBallSpawner()
-							SetBallCarrier( null )
-						}
-
-						SetTdmStateToNextRound()
-
-						file.winnerTeam = team
-						break
-					}
-				}
-			}
 			
-			if( flowstateSettings.is_halo_gamemode )
-			{
-				HaloPlayAnnounce( g_fCurrentRoundEndTime )
-			}
-			else 
+			if( !flowstateSettings.is_halo_gamemode ) //Todo(mk): change to if ( flowstateSettings.bEnablePlayAnnounce ) playlist var
 			{
 				if( Time() == g_fCurrentRoundEndTime - 60 )
 					PlayAnnounce( "diag_ap_aiNotify_circleMoves60sec_01" )
@@ -3744,9 +3753,7 @@ void function SimpleChampionUI()
 	else if ( !FlowState_Timer() )
 	{
 		while( Time() <= g_fCurrentRoundEndTime )
-		{
 			wait 1
-		}
 	}
 	
 	////////////////////////////////
@@ -3754,61 +3761,6 @@ void function SimpleChampionUI()
 	////////////////////////////////
 	
 	RunRoundEndCallbacks()
-
-	if( flowstateSettings.enable_oddball_gamemode && file.winnerTeam == -1 )
-	{
-		table< int,int > totalTeamsScore
-		
-		foreach(player in GetPlayerArray())
-		{
-			if ( !IsValid( player ) ) continue
-
-			if( !( player.GetTeam() in totalTeamsScore ) )
-			{
-				totalTeamsScore[ player.GetTeam() ] <- player.GetPlayerNetInt( "oddball_ballHeldTime" )
-			} else
-			{
-				totalTeamsScore[ player.GetTeam() ] += player.GetPlayerNetInt( "oddball_ballHeldTime" )
-			}
-		}
-		
-		int winnerTeam = -1
-		int lastScore = 0
-		bool isTie = false
-
-		foreach( team, score in totalTeamsScore )
-		{
-			if( score > lastScore )
-			{
-				winnerTeam = team
-				lastScore = score
-			}
-		}
-
-		foreach( team, score in totalTeamsScore )
-		{
-			if( team == winnerTeam )
-				continue
-			
-			if( lastScore == score )
-			{
-				isTie = true
-			}
-		}
-
-		if( isTie )
-			winnerTeam = -2
-
-		file.winnerTeam = winnerTeam
-
-		if( IsValid( GetBallCarrier() ) && IsAlive( GetBallCarrier() ) )
-		{
-			ClearBallCarrierPlayerSetup( GetBallCarrier() )
-			SetEmptyBallInBallSpawner()
-			SetBallCarrier( null )
-		}
-	}
-	
 	SetTdmStateToNextRound()
 	
 	if( isScenariosMode() )
@@ -4009,7 +3961,8 @@ void function SimpleChampionUI()
 	{
 		thread function() : ()
 		{
-			if(file.locationSettings.len() < NUMBER_OF_MAP_SLOTS_FSDM) 
+			int locationSettingsLen = file.locationSettings.len()
+			if( locationSettingsLen < NUMBER_OF_MAP_SLOTS_FSDM || locationSettingsLen == 0 ) 
 			{
 				VOTING_PHASE_ENABLE = false
 				return
@@ -4536,7 +4489,7 @@ void function PlayerRestoreHP( entity player, float health, float shields )
 	if ( !IsValid( player ) ) 
 		return
 		
-	if( !IsAlive( player) ) 
+	if( !IsAlive( player) )
 		return
 	
 	/* Debug code */
@@ -4552,8 +4505,13 @@ void function PlayerRestoreHP( entity player, float health, float shields )
 	// }
 
 	player.SetHealth( health )
-	Inventory_SetPlayerEquipment(player, "helmet_pickup_lv3", "helmet")
-	if(shields == 0) return
+	
+	if( flowstateSettings.bEnableHelmets )
+		Inventory_SetPlayerEquipment( player, "helmet_pickup_lv3", "helmet" )
+	
+	if(shields == 0) 
+		return
+		
 	else if(shields <= 50)
 		Inventory_SetPlayerEquipment(player, "armor_pickup_lv1", "armor")
 	else if(shields <= 75)
@@ -6236,39 +6194,39 @@ void function HisWattsons_HaloModFFA_KillStreakAnnounce( entity attacker )
 		switch( attacker.p.downedEnemy )
 		{
 			case 10:
-				BannerAssets_PlayAudioName( attacker, "halo_killionaire" )
+				WorldAssets_PlayAudioName( attacker, "halo_killionaire" )
 			break 
 			
 			case 9:
-				BannerAssets_PlayAudioName( attacker, "halo_killpocalypse" )
+				WorldAssets_PlayAudioName( attacker, "halo_killpocalypse" )
 			break 
 			
 			case 8:
-				BannerAssets_PlayAudioName( attacker, "halo_killtastrophe" )
+				WorldAssets_PlayAudioName( attacker, "halo_killtastrophe" )
 			break 
 			
 			case 7:
-				BannerAssets_PlayAudioName( attacker, "halo_killimanjaro" )
+				WorldAssets_PlayAudioName( attacker, "halo_killimanjaro" )
 			break 
 			
 			case 6:
-				BannerAssets_PlayAudioName( attacker, "halo_killtrocity" )
+				WorldAssets_PlayAudioName( attacker, "halo_killtrocity" )
 			break 
 			
 			case 5:
-				BannerAssets_PlayAudioName( attacker, "halo_killtacular" )
+				WorldAssets_PlayAudioName( attacker, "halo_killtacular" )
 			break 
 			
 			case 4:
-				BannerAssets_PlayAudioName( attacker, "halo_overkill" )
+				WorldAssets_PlayAudioName( attacker, "halo_overkill" )
 			break 
 			
 			case 3:
-				BannerAssets_PlayAudioName( attacker, "halo_triple_kill" )
+				WorldAssets_PlayAudioName( attacker, "halo_triple_kill" )
 			break 
 			
 			case 2:
-				BannerAssets_PlayAudioName( attacker, "halo_double_kill" )
+				WorldAssets_PlayAudioName( attacker, "halo_double_kill" )
 			break 
 		}
 
@@ -7306,11 +7264,11 @@ void function Common_DissolveDropable( entity prop )
 
 void function HaloAssets()
 {
-	BannerAssets_SetAllGroupsFunc
+	WorldAssets_SetAllGroupsFunc
 	(
 		void function()
 		{
-			BannerAssets_RegisterAudioGroup
+			WorldAssets_RegisterAudioGroup
 			(
 				"halo_audio",
 				false //(audio interruptable, false = queued for audio from this group. )
@@ -7318,24 +7276,18 @@ void function HaloAssets()
 		}
 	)
 	
-	BannerAssets_SetAllAssetsFunc
+	WorldAssets_SetAllAssetsFunc
 	(
 		void function()
 		{
 			array<string> haloAudio = WorldDrawAsset_GetAssetArrayByCategory( "halo" )
 
 			foreach( assetRef in haloAudio )
-			{
-				BannerAssets_GroupAppendAsset
-				(
-					"halo_audio",
-					WorldDrawAsset_AssetRefToID( assetRef )
-				)
-			}
+				WorldAssets_GroupAppendAsset( "halo_audio", assetRef )
 		}
 	)
 	
-	BannerAssets_Init()
+	WorldAssets_Init()
 	
 	AddCallback_OnTdmStateEnter_InProgress
 	(
@@ -7357,18 +7309,15 @@ void function HaloAssets()
 			}
 		
 			foreach( player in GetPlayerArray() )
-				BannerAssets_PlayAudio( player, audio )
+				WorldAssets_PlayAudio( player, audio )
 		}
 	)
 	
 	AddCallback_OnPlayerKilled( Callback_HaloOnPlayerKilled )
 }
 
-void function HaloPlayAnnounce( float roundEndTime )
+bool function HaloPlayAnnounce( int targetTime )
 {
-	int currentTime = int( floor( Time() ) )
-	int targetTime = int( floor( roundEndTime - currentTime ) )
-	
 	const table< int, string > eventTimes =
 	{
 		[ 60 ] 	= "media/halo/one_min_remaining.bik",
@@ -7382,8 +7331,10 @@ void function HaloPlayAnnounce( float roundEndTime )
 	if( targetTime in eventTimes )
 	{
 		foreach( entity player in GetPlayerArray() )
-			BannerAssets_PlayAudio( player, eventTimes[ targetTime ] )
+			WorldAssets_PlayAudio( player, eventTimes[ targetTime ] )
 	}
+	
+	return false
 }
 
 void function Callback_HaloOnPlayerKilled( entity victim, entity attacker, var damageInfo )
@@ -7536,24 +7487,63 @@ void function EndRound()
 	g_fCurrentRoundEndTime = Time()
 }
 
+const table<string, string> COMMUNITY_HEIRLOOMS = //(mk): order is important, client is hardcoded (for now) to send the id based on this order during selection.
+{
+	melee_pilot_emptyhanded = "mp_weapon_melee_survival",
+	melee_bolo_sword = "mp_weapon_bolo_sword_primary",
+	melee_karambit = "mp_weapon_karambit_primary",
+	melee_mc_sword = "mp_weapon_mc_sword_primary",
+	melee_mjolnir = "mp_weapon_mjolnir_primary",
+	melee_macks_knife = "mp_weapon_macks_knife_primary"
+}
+
 //todo(cafe): probably move this to a more general place
 void function FS_InitCommunityHeirlooms()
 {
 	// Disabled until we figure out which one crash the client
 	
-	file.heirlooms.append( CreateHeirloom( "melee_pilot_emptyhanded", "mp_weapon_melee_survival" ) )
-	file.heirlooms.append( CreateHeirloom( "melee_bolo_sword", "mp_weapon_bolo_sword_primary" ) )
-	file.heirlooms.append( CreateHeirloom( "melee_karambit", "mp_weapon_karambit_primary" ) )
-	file.heirlooms.append( CreateHeirloom( "melee_mc_sword", "mp_weapon_mc_sword_primary" ) )
-	file.heirlooms.append( CreateHeirloom( "melee_mjolnir", "mp_weapon_mjolnir_primary" ) )
-	file.heirlooms.append( CreateHeirloom( "melee_macks_knife", "mp_weapon_macks_knife_primary" ) )
+	// file.heirlooms.append( CreateHeirloom( "melee_pilot_emptyhanded", "mp_weapon_melee_survival" ) )
+	// file.heirlooms.append( CreateHeirloom( "melee_bolo_sword", "mp_weapon_bolo_sword_primary" ) )
+	// file.heirlooms.append( CreateHeirloom( "melee_karambit", "mp_weapon_karambit_primary" ) )
+	// file.heirlooms.append( CreateHeirloom( "melee_mc_sword", "mp_weapon_mc_sword_primary" ) )
+	// file.heirlooms.append( CreateHeirloom( "melee_mjolnir", "mp_weapon_mjolnir_primary" ) )
+	// file.heirlooms.append( CreateHeirloom( "melee_macks_knife", "mp_weapon_macks_knife_primary" ) )
+	
+	file.heirlooms.extend( CreateHeirloomArray( COMMUNITY_HEIRLOOMS ) )
 }
 
-Heirloom function CreateHeirloom( string melee, string primary )
+array<Heirloom> function CreateHeirloomArray( table< string, string > heirloomData ) //(mk): registration with validation
+{
+	array<Heirloom> heirloomsArray
+	
+	foreach( string melee, string primary in heirloomData )
+	{
+		if( !WeaponIsPrecached( melee ) )
+		{
+			#if DEVELOPER 
+				Warning( "Weapon " + melee + " was not precached and removed from list in " + FUNC_NAME() )
+			#endif 
+			
+			continue
+		}
+		
+		heirloomsArray.append( __CreateHeirloom( melee, primary ) )
+	}
+	
+	return heirloomsArray
+}
+
+int function __incrementHeirloomRegisterID()
+{
+	return file.__communityHeirloomRegisterID++
+}
+
+Heirloom function __CreateHeirloom( string melee, string primary )
 {
 	Heirloom heirloom
 	heirloom.melee = melee
 	heirloom.primary = primary
+	heirloom.id = __incrementHeirloomRegisterID()
 	
 	return heirloom
 }
@@ -7563,7 +7553,18 @@ array<Heirloom> function GetCommunityHeirlooms()
 	return file.heirlooms
 }
 
-void function FS_GiveRandomMelee(entity player, bool is1v1 = false )
+bool function IsHeirloomRegistered( int heirloomId )
+{
+	foreach( Heirloom heirloom in file.heirlooms )
+	{
+		if( heirloom.id == heirloomId )
+			return true
+	}
+	
+	return false
+}
+
+void function FS_GiveRandomMelee( entity player, bool is1v1 = false )
 {
 	// #if DEVELOPER
 	// DumpStack()
@@ -7571,14 +7572,131 @@ void function FS_GiveRandomMelee(entity player, bool is1v1 = false )
 	// #endif
 	
 	Heirloom randomMelee //todo(cafe): allow players to choose heirloom? possibly a new menu for "cosmetics" where players can choose the heirloom and camo color with persistence
-	
+
 	if( is1v1 )
-		randomMelee = GetCommunityHeirlooms()[player.p.chosenHeirloom]
-	else 
+	{
+		if( player.p.chosenHeirloom < GetCommunityHeirlooms().len() ) //(mk): defensive checks
+			randomMelee = GetCommunityHeirlooms()[ player.p.chosenHeirloom ] //this needs improved
+		else 
+			return
+	}
+	else
 		randomMelee = GetCommunityHeirlooms().getrandom()
-	
+
 	player.TakeNormalWeaponByIndexNow( WEAPON_INVENTORY_SLOT_PRIMARY_2 )
 	player.TakeOffhandWeapon( OFFHAND_MELEE )	
 	player.GiveWeapon( randomMelee.primary, WEAPON_INVENTORY_SLOT_PRIMARY_2, [] )
 	player.GiveOffhandWeapon( randomMelee.melee, OFFHAND_MELEE, [] )
+}
+
+bool function HackerVsProsTimerFunc( int timeRemaining )
+{
+	foreach( player in GetPlayerArray() )
+	{
+		if ( !IsValid( player ) ) 
+			continue
+		
+		if( player.GetPlayerGameStat( PGS_KILLS ) >= HACKERS_VS_PRO_MAX_KILLS )
+		{
+			SetTdmStateToNextRound()
+			return true
+		}
+	}
+	
+	return false
+}
+	
+bool function HaloOddballTimerFunc( int timeRemaining )
+{
+	table< int,int > totalTeamsScore
+				
+	foreach( player in GetPlayerArray() )
+	{
+		if ( !IsValid( player ) ) 
+			continue
+
+		if( !( player.GetTeam() in totalTeamsScore ) )
+			totalTeamsScore[ player.GetTeam() ] <- player.GetPlayerNetInt( "oddball_ballHeldTime" )
+		else
+			totalTeamsScore[ player.GetTeam() ] += player.GetPlayerNetInt( "oddball_ballHeldTime" )
+	}
+
+	foreach( team, score in totalTeamsScore )
+	{
+		if( score >= ODDBALL_POINTS_TO_WIN )
+		{
+			//set team as winner, show ui screen
+			if( flowstateSettings.enable_oddball_gamemode && IsValid( GetBallCarrier() ) && IsAlive( GetBallCarrier() ) )
+			{
+				ClearBallCarrierPlayerSetup( GetBallCarrier() )
+				SetEmptyBallInBallSpawner()
+				SetBallCarrier( null )
+			}
+
+			SetTdmStateToNextRound()
+
+			file.winnerTeam = team
+			return true
+		}
+	}
+	
+	return false
+}
+
+void function OnRoundEndOddball()
+{	
+	if( file.winnerTeam == -1 )
+	{
+		table< int,int > totalTeamsScore
+		
+		foreach(player in GetPlayerArray())
+		{
+			if ( !IsValid( player ) ) continue
+
+			if( !( player.GetTeam() in totalTeamsScore ) )
+			{
+				totalTeamsScore[ player.GetTeam() ] <- player.GetPlayerNetInt( "oddball_ballHeldTime" )
+			}
+			else
+			{
+				totalTeamsScore[ player.GetTeam() ] += player.GetPlayerNetInt( "oddball_ballHeldTime" )
+			}
+		}
+		
+		int winnerTeam = -1
+		int lastScore = 0
+		bool isTie = false
+
+		foreach( team, score in totalTeamsScore )
+		{
+			if( score > lastScore )
+			{
+				winnerTeam = team
+				lastScore = score
+			}
+		}
+
+		foreach( team, score in totalTeamsScore )
+		{
+			if( team == winnerTeam )
+				continue
+			
+			if( lastScore == score )
+			{
+				isTie = true
+			}
+		}
+
+		if( isTie )
+			winnerTeam = -2
+
+		file.winnerTeam = winnerTeam
+
+		if( IsValid( GetBallCarrier() ) && IsAlive( GetBallCarrier() ) )
+		{
+			ClearBallCarrierPlayerSetup( GetBallCarrier() )
+			SetEmptyBallInBallSpawner()
+			SetBallCarrier( null )
+		}
+	}
 }

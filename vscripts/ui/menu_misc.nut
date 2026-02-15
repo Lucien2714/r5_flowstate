@@ -83,9 +83,10 @@ void function OnMiscMenu_NavigateBack()
 	}
 		
 
-	if(ISAIMTRAINER){
+	if( ISAIMTRAINER && Playlist() == ePlaylists.fs_aimtrainer )
+	{
 		CloseAllMenus()
-		RunClientScript("ServerCallback_OpenFRChallengesMainMenu", PlayerKillsForChallengesUI)
+		RunClientScript( "ServerCallback_OpenFRChallengesMainMenu", PlayerKillsForChallengesUI )
 	}
 }
 

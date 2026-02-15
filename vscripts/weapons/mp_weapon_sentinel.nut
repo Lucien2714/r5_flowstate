@@ -22,7 +22,7 @@ void function MpWeaponSentinel_Init()
 		return
 
 	#if SERVER
-	AddClientCommandCallback( "Sentinel_TryCharge", ClientCommand_TryCharge )
+		AddClientCommandCallback( "Sentinel_TryCharge", ClientCommand_TryCharge )
 	#endif
 
 	#if CLIENT

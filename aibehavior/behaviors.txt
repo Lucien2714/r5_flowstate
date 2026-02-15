@@ -18,3 +18,4 @@ behavior_spectre
 behavior_pilot_elite
 behavior_turret_sentry
 behavior_nextbot
+behavior_combat_wraith

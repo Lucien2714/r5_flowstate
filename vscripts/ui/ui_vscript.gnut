@@ -313,6 +313,8 @@ global struct UIGlobals
 	bool 	playlistbool_flowstate_1v1mode
 	
 	bool 	bIsServerAdmin = false
+	bool	bIsAutoLoadingLobby
+	float	fShutdownTime
 }
 
 global UIGlobals uiGlobal

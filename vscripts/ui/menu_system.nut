@@ -87,6 +87,13 @@ void function InitSystemMenu( var newMenuArg ) //
 			file.motdText = ""
 		}
 	)
+	
+	AddUICallback_LevelShutdown( SetShutdownTime )
+}
+
+void function SetShutdownTime()
+{
+	uiGlobal.fShutdownTime = Time()
 }
 
 void function InitSystemPanelMain( var panel )
@@ -553,10 +560,12 @@ void function SetButtonData( var panel, int buttonIndex, ButtonData buttonData )
 
 void function OnSystemMenu_Close()
 {
-	if( ISAIMTRAINER && IsConnected() && Playlist() == ePlaylists.fs_aimtrainer ){
-		CloseAllMenus()
-		RunClientScript("ServerCallback_OpenFRChallengesMainMenu", PlayerKillsForChallengesUI)
-	}
+	// if( ISAIMTRAINER && IsConnected() && Playlist() == ePlaylists.fs_aimtrainer )
+	// {
+		// printt( "uiGlobal.bIsLeavingMatch is:", uiGlobal.bIsLeavingMatch )
+		// CloseAllMenus()
+		// RunClientScript( "ServerCallback_OpenFRChallengesMainMenu", PlayerKillsForChallengesUI )
+	// }
 }
 
 
@@ -564,10 +573,12 @@ void function OnSystemMenu_NavigateBack()
 {
 	Assert( GetActiveMenu() == file.menu )
 	CloseActiveMenu()
-	if( ISAIMTRAINER && IsConnected() && Playlist() == ePlaylists.fs_aimtrainer ){
-		CloseAllMenus()
-		RunClientScript("ServerCallback_OpenFRChallengesMainMenu", PlayerKillsForChallengesUI)
-	}
+	
+	// if( ISAIMTRAINER && IsConnected() && Playlist() == ePlaylists.fs_aimtrainer )
+	// {
+		// CloseAllMenus()
+		// RunClientScript("ServerCallback_OpenFRChallengesMainMenu", PlayerKillsForChallengesUI )
+	// }
 }
 
 
@@ -718,19 +729,19 @@ bool function ShouldDisplayOptInOptions()
 	return GetGlobalNetBool( "isOptInServer" )
 }
 
-void function UI_Callback_MOTD()
+void function UI_Callback_MOTD( bool force )
 {
-	SetMotdText( "" )
+	SetMotdText( "", force )
 }
 
-void function SetMotdText( string text )
+void function SetMotdText( string text, bool force )
 {
 	file.motdText = text + file.motdText
 	
 	if( !GetConVarBool( "enable_motd" ) )
 		return
 
-	if ( GetConVarBool( "open_motd_once_per_server" ) )
+	if ( GetConVarBool( "open_motd_once_per_server" ) && !force )
 	{
 		string server = GetServerID()
 	

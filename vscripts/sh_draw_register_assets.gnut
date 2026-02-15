@@ -5,6 +5,8 @@ global function WorldDrawAsset_RegisterAllAssets
 global function WorldDrawAsset_GetAssetArrayByCategory
 global function WorldDrawAsset_GetAssetLookupTable
 global function WorldDrawAsset_PrintAssetLookupTable
+global function WorldDrawAsset_RegisterAssetDatatable
+global function WorldDrawAsset_LookupAssetNameByRef
 
 #if CLIENT
 	global function ClientCodeCallback_PakRequestFinished //todo: move?
@@ -17,12 +19,11 @@ global function WorldDrawAsset_PrintAssetLookupTable
 	global function WorldDrawAsset_TransmitDesiredAssets
 #endif 
 
-const asset AUDIO_DATA_TABLE = $"datatable/flowstate_audio.rpak"
 const MAX_WAIT_FOR_RPAK_TRANSFER = 5
 const RPAK_MP_TEMP_PATH = ""
 const bool DEBUG_REGISTER_ASSETS = false
 
-struct AssetData 
+struct AssetRegisterData 
 {
 	string assetRef
 	string assetName
@@ -36,6 +37,7 @@ struct
 	
 	#if SERVER
 		array<int> invalidAssets
+		array<string> validateAssetDatatables
 	#endif
 	
 	#if CLIENT
@@ -49,44 +51,75 @@ struct
 	table<string, array<string> > categoryAssetArrays
 	table<string,string> assetLookupTable 
 	table<string,string> reverseAssetLookupTable
-
-	array< AssetData > scriptRegisteredAssets
+	array<AssetRegisterData> scriptRegisteredAssets
+	array<string> registeredAssetDatatables
 
 } file
 
+void function WorldDrawAsset_RegisterAssetDatatable( string dataTblString, bool bValidate = false )
+{
+	mAssert( !file.registeredAssetDatatables.contains( dataTblString ), "[WorldDrawAsset] Tried to register datatable \"%s\" more than once", dataTblString )
+	file.registeredAssetDatatables.append( dataTblString )
+	
+	#if SERVER
+		if( bValidate )
+			file.validateAssetDatatables.append( dataTblString )
+	#endif
+}
+
+void function RegisterAllAssetDatatables()
+{
+	if( IsFlowstateActive() && Flowstate_IsHaloMode() ) //Todo: Deprecate, halo mod is gone.
+		WorldDrawAsset_RegisterAssetDatatable( "datatable/flowstate_audio.rpak", true )
+		
+	if( fsGlobal.shouldRegisterGrapplesNGunsAudio )
+		WorldDrawAsset_RegisterAssetDatatable( "datatable/grapples_n_guns_audio.rpak", true )
+	
+	//...
+}
+
 void function RegisterHardcodedScriptAssets() //(mk): these should always be moved to an rpak when time permits.
 {
-	if( Playlist() == ePlaylists.fs_grapples_n_guns )
-	{
-		string grapplesCate = "grapples_n_guns" //Todo: Move this data to mod "grapples_n_guns" rpak
-		
-		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_cash.bik", grapplesCate, "cash" )
-		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_coin.bik", grapplesCate, "coin" )
-		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_meow.bik", grapplesCate, "meow" )
-		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_uwu.bik", grapplesCate, "uwu" )
-		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_hs_terminated.bik", grapplesCate, "terminated" )
-		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_intro1.bik", grapplesCate, "intro1" )
-		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_intro2.bik", grapplesCate, "intro2" )
-		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_intro3.bik", grapplesCate, "intro3" )
-		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_outro1.bik", grapplesCate, "outro1" )
-		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_outro2.bik", grapplesCate, "outro2" )
-		RegisterScriptAsset( "media/playlists/grapples_n_guns/grapples_outro3.bik", grapplesCate, "outro3" )
-	}
+	/* 
+		// This was moved to an audio_table datatable, but serves as a good example for registering hardcoded assets during development
+	
+		if( Playlist() == ePlaylists.fs_grapples_n_guns )
+		{
+			string grapplesCate = "grapples_n_guns"
+			{
+				ScriptRegisterAsset( "media/playlists/grapples_n_guns/grapples_cash.bik", "cash", grapplesCate )
+				ScriptRegisterAsset( "media/playlists/grapples_n_guns/grapples_coin.bik", "coin", grapplesCate )
+				ScriptRegisterAsset( "media/playlists/grapples_n_guns/grapples_meow.bik", "meow", grapplesCate )
+				ScriptRegisterAsset( "media/playlists/grapples_n_guns/grapples_uwu.bik", "uwu", grapplesCate )
+				ScriptRegisterAsset( "media/playlists/grapples_n_guns/grapples_hs_terminated.bik", "terminated", grapplesCate )
+			}
+			
+			grapplesCate = "grapples_n_guns_announce"
+			{
+				ScriptRegisterAsset( "media/playlists/grapples_n_guns/grapples_intro1.bik", "intro1", grapplesCate )
+				ScriptRegisterAsset( "media/playlists/grapples_n_guns/grapples_intro2.bik", "intro2", grapplesCate )
+				ScriptRegisterAsset( "media/playlists/grapples_n_guns/grapples_intro3.bik", "intro3", grapplesCate )
+				ScriptRegisterAsset( "media/playlists/grapples_n_guns/grapples_outro1.bik", "outro1", grapplesCate )
+				ScriptRegisterAsset( "media/playlists/grapples_n_guns/grapples_outro2.bik", "outro2", grapplesCate )
+				ScriptRegisterAsset( "media/playlists/grapples_n_guns/grapples_outro3.bik", "outro3", grapplesCate )
+			}
+		} 
+	*/
 	
 	//more...
 }
 
-void function RegisterScriptAsset( string assetRef, string category, string assetName )
+void function ScriptRegisterAsset( string assetRef, string assetName, string category, )
 {
-	foreach( AssetData data in file.scriptRegisteredAssets )
+	foreach( AssetRegisterData data in file.scriptRegisteredAssets )
 	{
 		if( data.assetRef == assetRef )
-			mAssert( 0, "Asset \"%s\" already exists in file.scriptRegisteredAssets", assetRef )
+			mAssert( 0, "[WorldDrawAsset] Asset \"%s\" already exists in file.scriptRegisteredAssets", assetRef )
 	}
 	
 	StringReplace( assetRef, "\\", "/" ) //just in case someone registers them wrong
 
-	AssetData data
+	AssetRegisterData data
 	
 	data.assetRef = assetRef
 	data.assetName = assetName
@@ -97,14 +130,26 @@ void function RegisterScriptAsset( string assetRef, string category, string asse
 
 void function WorldDrawAsset_RegisterAllAssets()
 {
-	#if SERVER 
-		if( IsFlowstateActive() )
+	#if SERVER
+		if( file.validateAssetDatatables.len() )
 		{
 			AddCallback_OnClientConnected
 			(
 				void function( entity player )
 				{
-					ValidateDataTable( player, AUDIO_DATA_TABLE )
+					foreach( string assetTblString in file.validateAssetDatatables )
+					{
+						asset dataTbl = CastStringToAsset( assetTblString )
+						
+						try 
+						{
+							ValidateDataTable( player, dataTbl )
+						}
+						catch( e )
+						{
+							Warning( "[WorldDrawAsset] Error validating datatable: " + e )
+						}
+					}
 				}
 			)
 		}
@@ -120,32 +165,51 @@ void function WorldDrawAsset_RegisterAllAssets()
 					WaitFrame()
 			#endif 
 		
-			if( IsFlowstateActive() ) //todo:callback for registering assets from rpak given an rpak name.. 
-			{
-				var audioTbl 		= GetDataTable( AUDIO_DATA_TABLE ) 
-				
-				int audioCount 		= GetDatatableRowCount( audioTbl )
-				int pathCol 		= GetDataTableColumnByName( audioTbl, "path" )
-				int nameCol 		= GetDataTableColumnByName( audioTbl, "name" )
-				int catCol			= GetDataTableColumnByName( audioTbl, "category" )
+			RegisterAllAssetDatatables()
 			
-				bool verify = audioCount != -1		
-				mAssert( verify, "No audio files?" )
+			foreach( string dataTblString in file.registeredAssetDatatables )
+			{
+				asset dataTblAsset 			= CastStringToAsset( dataTblString )
+				var dataTbl
 				
-				for ( int i = 0; i < audioCount; i++ )
-				{		
-					string bikAssetName  = GetDataTableString( audioTbl, i, nameCol )
-					string bikAssetRef   = GetDataTableString( audioTbl, i, pathCol )
-					string category		 = GetDataTableString( audioTbl, i, catCol )
+				try 
+				{
+					dataTbl 				= GetDataTable( dataTblAsset ) 
+				}
+				catch( e )
+				{
+					string error = "[WorldDrawAsset] Error registering datatable: " + e
+					Warning( error )
+					
+					#if DEVELOPER 
+						mAssert( 0, error )
+					#endif 
+				
+					continue
+				}
+				
+				int assetCount 		= GetDatatableRowCount( dataTbl )
+				int pathCol 		= GetDataTableColumnByName( dataTbl, "path" )
+				int nameCol 		= GetDataTableColumnByName( dataTbl, "name" )
+				int catCol			= GetDataTableColumnByName( dataTbl, "category" )
+			
+				bool verify = assetCount != -1		
+				mAssert( verify, "[WorldDrawAsset] No assets found in datatable \"%s\"", dataTblString )
+				
+				for ( int i = 0; i < assetCount; i++ )
+				{
+					string assetName  		= GetDataTableString( dataTbl, i, nameCol )
+					string assetRef   		= GetDataTableString( dataTbl, i, pathCol )
+					string category		 	= GetDataTableString( dataTbl, i, catCol )
 					
 					#if DEVELOPER
-						print_data += "\"" + bikAssetRef + "\"\n"
+						print_data += "\"" + assetRef + "\"\n"
 					#endif
 					
-					SortBikAsset( category, bikAssetRef )			
-					file.assets.append( bikAssetRef )
+					SortAsset( category, assetRef )			
+					file.assets.append( assetRef )
 					
-					WorldDrawAsset_AddToAssetTable( bikAssetName, bikAssetRef )
+					WorldDrawAsset_AddToAssetTable( assetName, assetRef )
 				}
 			}
 			
@@ -161,25 +225,24 @@ void function WorldDrawAsset_RegisterAllAssets()
 			}
 			
 			RegisterHardcodedScriptAssets()
-			foreach( AssetData data in file.scriptRegisteredAssets )
+			foreach( AssetRegisterData data in file.scriptRegisteredAssets )
 			{		
-				if( data.assetRef.find( ".bik" ) != -1 )
-					SortBikAsset( data.category, data.assetRef )	
+				SortAsset( data.category, data.assetRef )	
 					
 				file.assets.append( data.assetRef )	
-				WorldDrawAsset_AddToAssetTable( data.assetName, data.assetRef, true )
+				WorldDrawAsset_AddToAssetTable( data.assetName, data.assetRef )
 			}
 		}
 		catch( e )
 		{
-			string errorString = "Warning: Assets improperly configured in playlists from server. -- " + e
+			string errorString = "[WorldDrawAsset] Warning: Assets improperly configured in playlists from server. -- " + e
 			Warning( errorString )
 			mAssert( false, errorString )
 			return
 		}
 		
 		#if DEVELOPER && DEBUG_REGISTER_ASSETS
-			printt( "\n\n === AUDIO FROM DATATABLE === " )
+			printt( "\n\n === ASSETS FROM DATATABLE === " )
 			printt( "\n", print_data )
 		#endif
 	#endif 
@@ -207,7 +270,7 @@ void function WorldDrawAsset_RegisterAllAssets()
 		
 		//chain ifelse for more types.
 		if( potentialVarAsset.find( ".bik" ) != -1 )
-			assetType = eAssetType.VIDEO
+			assetType = eAssetType.BIK
 		else 
 			assetType = eAssetType.IMAGE
 		
@@ -220,7 +283,7 @@ void function WorldDrawAsset_RegisterAllAssets()
 						invalidAssets.append( iter )
 				break 
 				
-				case eAssetType.VIDEO:
+				case eAssetType.BIK:
 					
 					videoAssetsToCheck.append( iter ) 
 				break 
@@ -280,6 +343,7 @@ void function WorldDrawAsset_RegisterAllAssets()
 			assetName = StringReplace( assetName, "/", "_" )
 		}
 		
+		mAssert( !WorldDrawAsset_AssetTableContains( assetName ), "[WorldDrawAsset] Asset named \"%s\" already exists!", assetName )	
 		WorldDrawAsset_GetAssetLookupTable()[ assetName ] <- assetRef
 	}
 	
@@ -304,6 +368,14 @@ void function WorldDrawAsset_RegisterAllAssets()
 		return ( assetPath in file.reverseAssetLookupTable )
 	}
 	
+	string function WorldDrawAsset_LookupAssetNameByRef( string assetRef )
+	{
+		if( WorldDrawAsset_AssetReverseTableContains( assetRef ) )
+			return file.reverseAssetLookupTable[ assetRef ]
+			
+		return assetRef
+	}
+	
 	void function WorldDrawAsset_PrintAssetLookupTable()
 	{
 		string printStr
@@ -317,7 +389,7 @@ void function WorldDrawAsset_RegisterAllAssets()
 #endif 
 
 #if SERVER 
-	array<int> function WorldDrawAsset_GetInvalid()
+	array<int> function WorldDrawAsset_GetInvalid() //not used
 	{
 		return file.invalidAssets
 	}
@@ -454,7 +526,7 @@ void function WorldDrawAsset_RegisterAllAssets()
 	bool function VideoExists( int assetId )
 	{
 		if( !file.videoValidationComplete )
-			mAssert( false, "Tried to check if video exists before validator has ran." )
+			mAssert( 0, "[WorldDrawAsset] Tried to check if video exists before validator has ran." )
 			
 		return !file.invalidVideoAssets.contains( assetId )
 	}
@@ -507,15 +579,15 @@ void function WorldDrawAsset_RegisterAllAssets()
 #endif
 
 #if SERVER || CLIENT 
-	void function SortBikAsset( string category, string bikAssetRef )
+	void function SortAsset( string category, string assetRef )
 	{
-		if( empty( bikAssetRef ) )
+		if( empty( assetRef ) )
 			return
 			
 		if( !( category in file.categoryAssetArrays ) )
 			file.categoryAssetArrays[ category ] <- []
 				
-		file.categoryAssetArrays[ category ].append( bikAssetRef )
+		file.categoryAssetArrays[ category ].append( assetRef )
 	}
 	
 	array<string> function WorldDrawAsset_GetAssetArrayByCategory( string category )

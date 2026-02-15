@@ -502,6 +502,7 @@
         InheritProperties		SwitchButton
         style					DialogListButton
         navUp					SwitchEnableMotd
+		navDown					SwitchShowPos
         ConVar					"open_motd_once_per_server"
         list
         {
@@ -516,6 +517,71 @@
         pin_to_sibling_corner	BOTTOM_LEFT
         childGroupAlways        ChoiceButtonAlways
     }
+	
+	SwitchShowPos
+	{
+		ControlName				RuiButton
+		InheritProperties		SwitchButton
+		style					DialogListButton
+		navUp					SwitchShowMotd
+		navDown					SwitchShowFPS
+		ConVar					"cl_showpos_archived"
+		list
+		{
+			"#SETTING_OFF"	0
+			"#SETTING_ON"	1
+		}
+
+		visible                 1
+
+		pin_to_sibling			SwitchShowMotd
+		pin_corner_to_sibling	TOP_LEFT
+		pin_to_sibling_corner	BOTTOM_LEFT
+		childGroupAlways        ChoiceButtonAlways
+	}
+	
+	SwitchShowFPS
+	{
+		ControlName				RuiButton
+		InheritProperties		SwitchButton
+		style					DialogListButton
+		navUp					SwitchShowPos
+		navDown					SwitchShowDevWarning
+		ConVar					"cl_showfps_archived"
+		list
+		{
+			"#SETTING_OFF"	0
+			"#SETTING_ON"	1
+		}
+
+		visible                 1
+
+		pin_to_sibling			SwitchShowPos
+		pin_corner_to_sibling	TOP_LEFT
+		pin_to_sibling_corner	BOTTOM_LEFT
+		childGroupAlways        ChoiceButtonAlways
+	}
+	
+	SwitchShowDevWarning
+	{
+		ControlName				RuiButton
+		InheritProperties		SwitchButton
+		style					DialogListButton
+		navUp					SwitchShowFPS
+		ConVar					"show_dev_warning_dialogue"
+		list
+		{
+			"#SETTING_OFF"	0
+			"#SETTING_ON"	1
+		}
+
+		visible                 1
+
+		pin_to_sibling			SwitchShowFPS
+		pin_corner_to_sibling	TOP_LEFT
+		pin_to_sibling_corner	BOTTOM_LEFT
+		childGroupAlways        ChoiceButtonAlways
+	}
 
 	PanelBottom
 	{

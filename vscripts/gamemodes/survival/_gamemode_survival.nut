@@ -197,11 +197,11 @@ void function GamemodeSurvival_Init()
 	
 	if( Playlist() == ePlaylists.fs_haloMod_survival )
 	{
-		BannerAssets_SetAllGroupsFunc
+		WorldAssets_SetAllGroupsFunc
 		(
 			void function()
 			{
-				BannerAssets_RegisterAudioGroup
+				WorldAssets_RegisterAudioGroup
 				(
 					"halo_audio",
 					false //(audio interruptable, false = queued for audio from this group. )
@@ -209,24 +209,18 @@ void function GamemodeSurvival_Init()
 			}
 		)
 		
-		BannerAssets_SetAllAssetsFunc
+		WorldAssets_SetAllAssetsFunc
 		(
 			void function()
 			{
 				array<string> haloAudio = WorldDrawAsset_GetAssetArrayByCategory( "halo" )
 
 				foreach( assetRef in haloAudio )
-				{
-					BannerAssets_GroupAppendAsset
-					(
-						"halo_audio",
-						WorldDrawAsset_AssetRefToID( assetRef )
-					)
-				}
+					WorldAssets_GroupAppendAsset( "halo_audio", assetRef )
 			}
 		)
 		
-		BannerAssets_Init()
+		WorldAssets_Init()
 		
 		//Move faster while adsing
 		AddCallback_OnPlayerZoomIn( FS_HaloMod_OnPlayerZoomIn )

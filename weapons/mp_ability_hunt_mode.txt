@@ -22,8 +22,8 @@ WeaponData
 
 	"is_toss_weapon"								"1"
 	"toss_pullout_time"								"0.100000"
-	"toss_time"										"1.600000"
-	"toss_overhead_time"							"1.600000"
+	"toss_time"										"1.200000"
+	"toss_overhead_time"							"1.200000"
 	"max_cook_time"									"0"
 
 	"instant_swap_to"								"0"
@@ -86,15 +86,15 @@ WeaponData
 
 	MP_BASE
 	{
-		"ammo_clip_size"								"240"
+		"ammo_clip_size"								"150"
         "ammo_default_total"							"0"
         "ammo_display"									"count"
-        "ammo_min_to_fire"								"240"
-        "ammo_per_shot"									"240"
+        "ammo_min_to_fire"								"150"
+        "ammo_per_shot"									"150"
         "ammo_stockpile_max"							"0"
         "regen_ammo_refill_rate"						"1"
         "regen_ammo_refill_start_delay"					"0.000000"
-        "fire_duration"									"30.000000"
+        "fire_duration"									"25.000000"
         "ammo_no_remove_from_stockpile"					"0"
 
 		"enable_highlight_networking_on_creation"		"<KEEP_DEFAULT>"

@@ -8,7 +8,6 @@ global function GetPlayerEntityByUID
 global function GetPlayerEntityByName
 global function IsServerAdmin
 global function GetAdminList
-global function IsAuthEnabled
 global function AdminMessage
 global function SendResponse
 global function SendPM
@@ -17,6 +16,7 @@ global function SendPM
 global function IsStringNumeric
 global function IsStringNumber
 global function IsStringBool
+global function StringToBool
 global function StringRemoveControlCharacters
 global function Concatenate
 global function LineBreak
@@ -25,13 +25,14 @@ global function UnescapeWithRules
 global function FindFirstUnescaped
 global function SplitUnescapedWithRules
 global function ResolveFormattersForPlayerMessage
+global function PrepareForJson
 
 //print util -- moved to _threads
 // global function print_string_array
 // global function print_var_table
 // global function print_var_array
 
-//Tracker print-to console as native
+//Tracker print-to-console as native
 global function sqprint
 global function sqerror
 global function sqwarning
@@ -50,19 +51,22 @@ global function __PlayerAdminsInit
 global function ClientCommand_mkos_return_data
 global function ClientCommand_mkos_admin
 global function CheckAdmin_OnConnect
+global function IsAuthEnabled
 
 //misc
-global function TP
+global function TrackerUtilityInit
 global function EnableVoice
 global function PlayTimeFromSecondsString
 global function Tracker_DetermineNextMap
 global function Tracker_GotoNextMap
-global function PrepareForJson
 global function ArrayUniqueInt
-global function CodeCallback_SendMessage
-global function TrackerUtilityInit
+global function ArrayUniqueString
 global function IsMapPlaylistGamemodeRotationEnabled
 global function DecideNextMapPlaylistGamemodeRotation
+global function TP
+
+//code callbacks
+global function CodeCallback_SendMessage
 
 // PWLA server util
 global function RuleReminders_Init
@@ -71,6 +75,7 @@ global function RuleReminders_Init
 	global function RegExpUnitTest
 	global function RegExpUnitTest2
 	global function StringUnitTest
+	global function TestRandom
 #endif
 
 #if TRACKER && HAS_TRACKER_DLL
@@ -434,7 +439,7 @@ void function TrackerUtilityInit()
 			foreach ( admin_pair in list ) //backwards compat
 			{
 				pair = admin_pair
-				if( admin_pair.find( "-" ) != -1 )
+				if( admin_pair.find( "-" ) != -1 ) //todo: problematic backwards compat for usernames containing hyphen.
 				{
 					array<string> a_format = split( admin_pair, "-" )
 					file.adminsArray.append( a_format[ 1 ] )
@@ -822,12 +827,15 @@ void function TrackerUtilityInit()
 
 					if ( IsServerAdmin( banPlayerUID ) )
 					{
-						Message( player, "Cannot ban admin" )
+						Message( player, format( "Cannot ban admin %s", banPlayerName ) )
 						return true
 					}
 
 					#if HAS_TRACKER_DLL
-						BanPlayerById( banPlayerUID, banReason, player.GetPlatformUID() )
+						// if( args.contains( "-id" ) )
+							// BanPlayerByIdOnly( banPlayerUID, banReason, player.GetPlatformUID() ) //not released yet.
+						// else
+							BanPlayerById( banPlayerUID, banReason, player.GetPlatformUID() )
 					#else
 						BanPlayerById( banPlayerUID, banReason )
 					#endif
@@ -1099,9 +1107,8 @@ void function TrackerUtilityInit()
 					playlist = FindPlaylistName( param2 )
 
 					if( playlist == "" )
-						errorMsg = format( "Could not find a valid playlist via partial matching for criteria '%s'", playlist )
-
-					if( !GetPlaylistMaps( playlist ).contains( map ) )
+						errorMsg = format( "Could not find a valid playlist via partial matching for criteria '%s'", param2 )
+					else if( !GetPlaylistMaps( playlist ).contains( map ) )
 						errorMsg = format( "Map '%s' not in playlist '%s' - rejecting cc map load", map, playlist )
 
 					if( errorMsg != "" )
@@ -1364,9 +1371,28 @@ void function TrackerUtilityInit()
 			{
 				#if TRACKER && HAS_TRACKER_DLL
 
+					const array<string> PROTECTED_SETTINGS =
+					[
+						"apikey", /* blocked at engine level */
+						"webhooks.PLAYERS_WEBHOOK",
+						"webhooks.MATCHES_WEBHOOK"
+					]
+
 					if ( args.len() < 2)
 					{
 						Message( player, "Failed", "Param 1 of command 'setting' requires key name" )
+						return true
+					}
+
+					if( param == "" )
+					{
+						Message( player, "Failed", "setting name cannot be empty" )
+						return true
+					}
+
+					if( PROTECTED_SETTINGS.contains( param ) )
+					{
+						Message( player, "Failed", format( "Setting \"%s\" is a protected setting and cannot be shown.", param ) )
 						return true
 					}
 
@@ -1981,13 +2007,6 @@ void function TrackerUtilityInit()
 
 				return true
 			}
-			case "gamerules":
-			{
-				//TODO: mini framework for parsing valid map/playlist combos
-				// needs server function capable of swapping playlist & map
-				//CreateServer("","","mp_rr_desertlands_64k_x_64k","survival_solos", 0)
-				break
-			}
 			case "movement_recorder_playback_rate":
 			{
 				if( IsStringNumeric( param ) )
@@ -2004,13 +2023,13 @@ void function TrackerUtilityInit()
 			}
 			case "kill_banners":
 			{
-				BannerAssets_KillAllBanners()
+				WorldAssets_KillAllBanners()
 				Message( player, "Banners stopped" )
 				break
 			}
 			case "start_banners":
 			{
-				BannerAssets_Restart()
+				WorldAssets_Restart()
 				Message( player, "Banners restarted" )
 				break
 			}
@@ -2150,6 +2169,9 @@ void function TrackerUtilityInit()
 					}
 				}
 
+				if( args.contains( "-motd" ) )
+					AdminCommandOpenMOTD( timeoutPlayer )
+
 				break
 			}
 			case "gettimeout":
@@ -2198,6 +2220,22 @@ void function TrackerUtilityInit()
 				Dev_CommandLineAddParm( "autoRotateForceDisable", bSettingValue )
 
 				Message( player, "Success", format( "Force Auto map rotation was set to \"%s\"", bSettingValue ) )
+				break
+			}
+			case "show_motd":
+			{
+				entity candidate = GetPlayer( param )
+				if( !IsValid( candidate ) )
+				{
+					Message( player, "Error", "Invalid player " + param )
+					break
+				}
+
+				if( !AdminCommandOpenMOTD( candidate ) )
+					Message( player, "Error", "Player disconnected" )
+				else
+					Message( player, "Sent", "If the player has MOTD enabled they will see it popup,\n else they would need to manually view it from menu button" )
+
 				break
 			}
 			//more...
@@ -2956,6 +2994,19 @@ array<int> function ArrayUniqueInt( array<int> arr )
 	return newArr
 }
 
+array<string> function ArrayUniqueString( array<string> arr )
+{
+	array<string> newArr
+
+	foreach( item in arr )
+	{
+		if( !newArr.contains( item ) )
+			newArr.append( item )
+	}
+
+	return newArr
+}
+
 void function sqprint( ... )
 {
 	if ( vargc <= 0 )
@@ -2988,7 +3039,7 @@ void function sqerror( ... )
 	#endif
 }
 
-void function sqwarning( ... ) //changed to work like Warning() with format for consistency.
+void function sqwarning( ... ) //changed to work as format
 {
 	if ( vargc <= 0 )
 		return
@@ -3049,6 +3100,9 @@ const int STAT_PREFIX_POS = 6
 const int SETTING_PREFIX_POS = 9
 string function GetFormatterValueForPlayer( entity player, string formatter )
 {
+	if( !IsValid( player ) )
+		return "INVALID_PLAYER"
+
 	switch( formatter )
 	{
 		case "#player":
@@ -3662,3 +3716,36 @@ void function RuleReminders_Init(){
 	int duration=GetPlaylistVarInt( GetCurrentPlaylistName(), "reminder_message_duration", 10 )
 	thread RuleReminder(total_messages, interval, duration)
 }
+
+#if DEVELOPER
+	void function TestRandom()
+	{
+		thread
+		(
+			void function()
+			{
+				const int RUN_COUNT = 100000
+				array<string> randomStuff
+				for( int i = 0; i < 5; i++ )
+					randomStuff.append( "rand" + i )
+
+				string randSelection
+				int idxZeroSelections
+
+				for( int j = 0; j < RUN_COUNT; j++ )
+				{
+					randSelection = randomStuff.getrandom()
+					if( randSelection == "rand0" )
+						idxZeroSelections++
+				}
+
+				printf
+				(
+					"Ran %d times, selected idxZero %d times.",
+					RUN_COUNT,
+					idxZeroSelections
+				)
+			}
+		)()
+	}
+#endif

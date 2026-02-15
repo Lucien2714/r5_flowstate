@@ -4289,7 +4289,7 @@ void function SatchelDetonationHint_Destroy( entity player )
 void function PlayerUsedOffhand( entity player, entity offhandWeapon, bool sendPINEvent = true, entity trackedProjectile = null, table pinAdditionalData = {} )
 {
 	#if SERVER
-		array<int> offhandIndices = [ OFFHAND_TACTICAL, OFFHAND_ULTIMATE, OFFHAND_LEFT, OFFHAND_RIGHT, OFFHAND_ANTIRODEO, OFFHAND_INVENTORY, OFFHAND_EQUIPMENT ]
+		const array<int> offhandIndices = [ OFFHAND_TACTICAL, OFFHAND_ULTIMATE, OFFHAND_LEFT, OFFHAND_RIGHT, OFFHAND_ANTIRODEO, OFFHAND_INVENTORY, OFFHAND_EQUIPMENT ]
 
 		foreach ( func in svGlobal.onPlayerUsedOffhandCallbacks )
 		{

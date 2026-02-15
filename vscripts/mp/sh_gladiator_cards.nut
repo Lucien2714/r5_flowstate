@@ -436,7 +436,6 @@ void function ShGladiatorCards_LevelInit()
 		AddCallback_OnYouRespawned( OnYouRespawned ) // for dev
 		AddCallback_OnPlayerLifeStateChanged( OnPlayerLifestateChanged )
 		AddCallback_PlayerClassChanged( OnPlayerClassChanged )
-		AddCreateCallback( "player", OnPlayerCreated )
 
 		AddCallback_GameStateEnter( eGameState.WinnerDetermined, OnWinnerDetermined )
 
@@ -447,6 +446,8 @@ void function ShGladiatorCards_LevelInit()
 		RegisterSignal( "ActualUpdateNestedGladiatorCard" )
 		RegisterSignal( "YouMayProceedWithStillCCS" )
 		RegisterSignal( "HaltMenuGladCardThread" )
+		
+		Tracker_RegisterPreloadStats( BADGE_STAT_KEYS )
 	#endif
 
 	AddCallback_OnItemFlavorRegistered( eItemType.character, OnItemFlavorRegistered_Character )
@@ -569,17 +570,6 @@ BadgeData ornull function GetBadge( int GUID )
 		
 	return null
 }
-
-#if CLIENT
-	void function OnPlayerCreated( entity newPlayer )
-	{	
-		entity localPlayer = GetLocalClientPlayer()
-		if( newPlayer == localPlayer )
-			Tracker_PreloadStatArray( GetPlayerArray(), BADGE_STAT_KEYS )
-		else
-			Tracker_PreloadStatArray( [ newPlayer ], BADGE_STAT_KEYS )
-	}
-#endif
 
 #if UI
 void function ShGladiatorCards_LevelShutdown()

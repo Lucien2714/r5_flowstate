@@ -231,9 +231,9 @@ void function ShLoadouts_LevelInit_Begin()
 		if( GetCurrentPlaylistVarBool( "enable_loadouts_set", true ) )
 			AddClientCommandCallback( "loadouts_set", ClientCommand_loadouts_set )
 			
-		AddClientCommandCallback( "loadouts_reset_persistent", ClientCommand_loadouts_reset_persistent )
-		AddClientCommandCallback( "loadouts_devset", ClientCommand_loadouts_devset )
 		#if DEVELOPER
+			AddClientCommandCallback( "loadouts_reset_persistent", ClientCommand_loadouts_reset_persistent )
+			AddClientCommandCallback( "loadouts_devset", ClientCommand_loadouts_devset )
 			AddCallback_GeneratePDef( GenerateLoadoutsPDef )
 			AddClientCommandCallback( "loadouts_dump", ClientCommand_loadouts_dump )
 		#endif
@@ -2122,6 +2122,9 @@ bool function ClientCommand_loadouts_devset( entity commandPlayer, array<string>
 #if SERVER
 bool function ClientCommand_loadouts_reset_persistent( entity player, array<string> args )
 {
+	if ( GetConVarInt( "sv_cheats" ) != 1 ) //(mk): Couldn't find any usage of calls to this, but it's still an exploit withou validation as players can execute client commands from console and trigger this.  Adding sv_cheats check for now.
+		return false
+		
 	ValidateAndFixAllLoadoutSlots( ToEHI( player ), false, false, true, false )
 	return true
 }

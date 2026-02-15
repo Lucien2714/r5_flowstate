@@ -79,5 +79,41 @@
 				"max"		"1"
 			}
 		}
+		"cl_showpos_archived"
+		{
+			"helpText" "Stores preference for cl_showpos"
+			"flags" 		"ARCHIVE|RELEASE"
+
+			"Values"
+			{
+				"default"	"0"
+				"min" 		"0"
+				"max"		"1"
+			}
+		}
+		"cl_showfps_archived"
+		{
+			"helpText" "Stores preference for cl_showfps"
+			"flags" 		"ARCHIVE|RELEASE"
+
+			"Values"
+			{
+				"default"	"0"
+				"min" 		"0"
+				"max"		"1"
+			}
+		}
+		"show_dev_warning_dialogue"
+		{
+			"helpText" "Whether or not to show warning when launching game if in developer mode."
+			"flags" 		"ARCHIVE|RELEASE"
+
+			"Values"
+			{
+				"default"	"1"
+				"min" 		"0"
+				"max"		"1"
+			}
+		}	
 	}
 }

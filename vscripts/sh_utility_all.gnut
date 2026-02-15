@@ -218,6 +218,10 @@ void function DumpStack( int offset = 1 )
 	{
 		if ( !( "src" in getstackinfos(i) ) )
 			break
+			
+		if( getstackinfos(i)["func"] == "PrintCallStack" || getstackinfos(i)["func"] == "DumpStack" )	
+			continue
+			
 		printl( i + " File : " + getstackinfos(i)["src"] + " [" + getstackinfos(i)["line"] + "]\n    Function : " + getstackinfos(i)["func"] + "() " )
 	}
 }

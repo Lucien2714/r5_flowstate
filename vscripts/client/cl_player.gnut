@@ -58,6 +58,8 @@ global function PlayerSetting_DamageClosesMenu
 global function UpdatePlayerIsMuted //for future usage
 global function RunMuteClears
 
+global function AddCallback_OnPlayerConnected
+
 #if ENTITYVAR_DEPRECATED
 	global function OnVarChangedCallback_PlayerMovement
 #endif
@@ -93,6 +95,7 @@ struct
 	table<entity, entity> healthBars
 	table<entity, float> onPlayerDamagedTimes	
 	table< string, MuteData > mutedPlayers
+	array< void functionref( entity ) > onPlayerConnectedCallbacks
 	
 } file
 
@@ -175,6 +178,12 @@ void function ClPlayer_Init()
 	OnSettingsUpdated()
 	
 	AddCallback_OnPlayerDisconnected( RunMuteClears )
+}
+
+void function AddCallback_OnPlayerConnected( void functionref( entity ) callbackFunc )
+{
+	mAssert( !file.onPlayerConnectedCallbacks.contains( callbackFunc ), "Tried to add callback func %s with %s() but it already exists", string( callbackFunc ), FUNC_NAME() )
+	file.onPlayerConnectedCallbacks.append( callbackFunc )
 }
 
 void function FS_HealthBars_StartForPlayer( entity player )
@@ -445,16 +454,19 @@ void function OnSettingsUpdated()
 	int iCheckPlayerDamageCloseSetting = GetConVarInt( "player_setting_damage_closes_deathbox_menu" )
 	int iCheckShowHealthbarsSetting = GetConVarInt( "enable_healthbar" )
 	
-	if( iCheckPlayerDamageCloseSetting > 1 || iCheckShowHealthbarsSetting > 1 )
-		return
-	
 	if( iCheckPlayerDamageCloseSetting != file.player_setting_damage_closes_deathbox_menu  )
 	{
+		if( iCheckPlayerDamageCloseSetting > 1 )
+			return 
+			
 		file.player_setting_damage_closes_deathbox_menu = iCheckPlayerDamageCloseSetting
 	}
 	
 	if( iCheckShowHealthbarsSetting != file.enable_healthbar )
 	{	
+		if( iCheckShowHealthbarsSetting > 1 )
+			return 
+			
 		file.enable_healthbar = iCheckShowHealthbarsSetting
 		
 		if( IsLobby() || !file.bDoesPlaylistAllowHealthbars )
@@ -840,6 +852,9 @@ void function PlayerConnectedOrDisconnected( entity player, int state, string di
 
 			Obituary_Print_Localized( Localize( "#MP_PLAYER_CONNECTED", playerName ), playerNameColor )
 		// }
+		
+		foreach( callbackFunc in file.onPlayerConnectedCallbacks )
+			callbackFunc( player )
 	}
 }
 

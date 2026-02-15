@@ -996,10 +996,6 @@ bool function ClApexScreens_PosInStaticBanner( vector pos )
 
 void function UpdateScreensContent( array<ApexScreenState> screenList )
 {
-	if ( GetGameState() >= eGameState.WinnerDetermined )
-		return
-
-
 	entity localViewPlayer = GetLocalViewPlayer()
 	bool isCrypto          = PlayerHasPassive( localViewPlayer, ePassives.PAS_CRYPTO )
 	bool inCamera          = IsValid( localViewPlayer.p.cryptoActiveCamera )
@@ -1033,6 +1029,9 @@ void function UpdateScreensContent( array<ApexScreenState> screenList )
 			RuiDestroyIfAlive( screen.rui )
 			screen.rui = null
 		}
+		
+		if ( GetGameState() >= eGameState.WinnerDetermined )
+			return
 
 		bool doStandardVars = (!screen.overrideInfoIsValid || !screen.overrideInfo.skipStandardVars)
 		bool needStartup = (shouldShow && (screen.rui == null))

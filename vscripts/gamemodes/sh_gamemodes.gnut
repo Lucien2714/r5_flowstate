@@ -59,6 +59,8 @@ global function GameMode_SetEvacEnabled
 
 global function GameMode_GetLoadoutSelectTime
 
+global function GameMode_GetAllGamemodeData
+
 global struct GamemodeSettings
 {
 	string name = ""
@@ -349,6 +351,11 @@ void function GameModes_Init()
 
 	////
 	GameMode_VerifyModes()
+}
+
+table< string, GamemodeSettings > function GameMode_GetAllGamemodeData()
+{
+	return file.gameModeDefs
 }
 
 // TODO: scoreboards

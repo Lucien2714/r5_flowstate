@@ -222,7 +222,9 @@ void function Gamemode1v1_OnSelectedLegend( ItemFlavor character )
 void function RealisticTTVMode_OnSelectedLegend( ItemFlavor character )
 {
 	entity player = GetLocalClientPlayer()
-	
+	if( player != GetLocalViewPlayer() )
+		return
+		
 	thread 
 	(
 		void function() : ( player, character )
@@ -307,7 +309,7 @@ void function CL_FSDM_RegisterNetworkFunctions()
 	RegisterNetworkedVariableChangeCallback_time( "flowstate_DMStartTime", Flowstate_StartTimeChanged )
 	RegisterNetworkedVariableChangeCallback_time( "flowstate_DMRoundEndTime", Flowstate_RoundEndTimeChanged )
 	
-	if( G_REGISTER_1V1_NETVARS_FOR_PLAYLIST.contains( Playlist() ) )
+	if( g_bIs1v1GameType() )
 	{
 		RegisterNetworkedVariableChangeCallback_ent( "FSDM_1v1_Enemy", Flowstate_1v1EnemyChanged )
 		RegisterNetworkedVariableChangeCallback_int( "FS_1v1_PlayerState", FS_1v1_PlayerStateChanged )
@@ -656,7 +658,7 @@ void function Cl_OnResolutionChanged()
 	UISize screenSize = GetScreenSize()
 	Hud_SetSize( HudElement( "FS_DMCountDown_Frame" ), 248 * screenSize.width / 1920.0, 88 * screenSize.height / 1080.0 )
 	
-	if( IsValid( GetLocalViewPlayer() ) && G_REGISTER_1V1_NETVARS_FOR_PLAYLIST.contains( Playlist() ) )
+	if( IsValid( GetLocalViewPlayer() ) && g_bIs1v1GameType() )
 		FS_1v1_PlayerStateChanged( GetLocalViewPlayer(), 0, GetLocalViewPlayer().GetPlayerNetInt( "FS_1v1_PlayerState" ) , false )
 
 	if( GetGlobalNetInt( "FSDM_GameState" ) != eTDMState.IN_PROGRESS )
@@ -719,6 +721,9 @@ void function Flowstate_ShowRoundEndTimeUI( float new )
 		if( !IsValid( player ) )
 			return 
 			
+		if( player != GetLocalViewPlayer() )
+			return
+			
 		Signal( player, "FSDM_EndTimer")
 		Hud_SetVisible( HudElement( "FS_DMCountDown_Text" ), false )
 		Hud_SetVisible( HudElement( "FS_DMCountDown_Frame" ), false )
@@ -742,6 +747,10 @@ void function Flowstate_ShowRoundEndTimeUI( float new )
 void function Flowstate_DMTimer_Thread( float endtime )
 {
 	entity player = GetLocalClientPlayer()
+	
+	if( player != GetLocalViewPlayer() )
+		return
+	
 	Signal( player, "FSDM_EndTimer")
 	EndSignal( player, "FSDM_EndTimer")
 
@@ -833,7 +842,9 @@ void function Flowstate_ShowStartTimeUI( float new )
 void function Flowstate_StartTime_Thread( float endtime )
 {
 	entity player = GetLocalClientPlayer()
-
+	if( player != GetLocalViewPlayer() )
+		return
+		
 	OnThreadEnd(
 		function() : ()
 		{
@@ -2766,9 +2777,10 @@ void function Send1v1SettingsToServer()
 	player.ClientCommand( "CC_1v1_CamoColor " + GetConVarString( "fs_1v1_camo" ) )
 	player.ClientCommand( "CC_1v1_Heirloom " + GetConVarString( "fs_1v1_heirloom" ) )
 	player.ClientCommand( "CC_1v1_MaxEnemyLatency " + GetConVarString( "fs_1v1_maxenemylatency" ) )
-	//more
+	player.ClientCommand( "CC_1v1_MaxIBMMTime " + GetConVarString( "fs_1v1_maxibmmtime" ) ) //(mk): must be after CC_1v1_IBMM, as CC_1v1_IBMM will set 0|3. 	
+	//more...
 	
-	player.ClientCommand( "CC_1v1_MaxIBMMTime " + GetConVarString( "fs_1v1_maxibmmtime" ) ) //(mk): must be after CC_1v1_IBMM, as CC_1v1_IBMM will set 0|3. Should also always be last as it fires signal "SettingsReceieved"
+	player.ClientCommand( "CC_1v1_SettingsSent" ) //(mk): should also always be last as it fires signal "SettingsReceieved" on the server
 }
 
 void function FS_RestButton( entity player )

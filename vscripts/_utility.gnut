@@ -6111,3 +6111,13 @@ void function LoadPak( string pak )
 {
 	__ServerCommand( format( "pak_requestload %s", pak ) )
 }
+
+void function DisablePlayerCollision( entity player )
+{
+	player.kv.contents = CONTENTS_BULLETCLIP | CONTENTS_MONSTERCLIP | CONTENTS_HITBOX | CONTENTS_BLOCKLOS | CONTENTS_PHYSICSCLIP; //CONTENTS_PLAYERCLIP
+}
+
+void function EnablePlayerCollision( entity player )
+{
+	player.kv.contents = CONTENTS_BULLETCLIP | CONTENTS_MONSTERCLIP | CONTENTS_HITBOX | CONTENTS_BLOCKLOS | CONTENTS_PHYSICSCLIP | CONTENTS_PLAYERCLIP
+}

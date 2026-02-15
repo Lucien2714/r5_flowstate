@@ -287,16 +287,14 @@ void function ServerCallback_OpenFRChallengesMenu(int challengeName, int shothit
     // thread UpdateUIRespawnTimer()
 }
 
-void function ServerCallback_OpenFRChallengesMainMenu(int dummiesKilled)
+void function ServerCallback_OpenFRChallengesMainMenu( int dummiesKilled )
 {
-	entity player = GetLocalClientPlayer()
-	RunUIScript( "OpenFRChallengesMainMenu", dummiesKilled)
+	RunUIScript( "OpenFRChallengesMainMenu", dummiesKilled )
 }
 
-void function ServerCallback_OpenFRChallengesHistory(int dummiesKilled)
+void function ServerCallback_OpenFRChallengesHistory( int dummiesKilled )
 {
-	entity player = GetLocalClientPlayer()
-	RunUIScript( "OpenFRChallengesHistory", dummiesKilled)
+	RunUIScript( "OpenFRChallengesHistory", dummiesKilled )
 }
 
 void function ServerCallback_OpenFRChallengesSettings()

@@ -123,7 +123,7 @@ Scripts:
 When: "SERVER || CLIENT"
 Scripts:
 [
-	mp/banner/sh_banner_asset.nut
+	mp/world/sh_world_assets.nut
 ]
 
 When: "CLIENT"
@@ -884,6 +884,7 @@ Scripts:
 	ui/dialogs/report_player.nut
 	ui/dialogs/server_motd.nut
 	ui/menu_eula_dialog.nut
+	ui/menu_dev_warning_dialogue.nut
 	ui/menu_accessibility_dialog.nut
 	ui/menu_postgame.nut
 	

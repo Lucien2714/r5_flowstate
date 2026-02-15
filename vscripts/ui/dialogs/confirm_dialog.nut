@@ -158,8 +158,8 @@ void function ConfirmDialog_Yes( var button )
 	if ( file.showDialogData == null )
 		return
 
-	ConfirmDialogData confirmData = _confirmData()
-	if ( GetActiveMenu() == confirmData.__menu )
+	ConfirmDialogData confirmData = _confirmData()	
+	if ( GetActiveMenu() == confirmData.__menu )	
 		CloseActiveMenu()
 
 	if ( confirmData.resultCallback != null )

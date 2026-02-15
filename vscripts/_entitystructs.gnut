@@ -539,6 +539,10 @@ global struct ServerEntityStruct
 	int hackableTerminalSpawnID
 	int terminalID
 	bool isBeingDataknifed
+	
+	int stateFlags
+	
+	array< void functionref( entity, entity, var ) > onEntMeleedCallbacks
 }
 
 global struct MeritData
@@ -903,11 +907,11 @@ global struct ServerPlayerStruct
 	array<int> invalidAssets	= []
 	bool bannersValidated		= false
 	float haloGrenadeAttackTime = 0.0
-	bool isPlayingFlowstateAudio= false
+	table< int, bool > isPlayingAudio = {}
 	entity killerByKnock		
 	table< table<int, int> > groupTypeToRuiID = {}
 	KillHistoryArray killHistoryArray = []
-	array<int> audioQueue = []
+	table< int, array< int > > audioQueue = {} //group -> audio queue array
 	int unmuteTime = -1
 	int msg
 	bool wonctf = false
@@ -917,6 +921,9 @@ global struct ServerPlayerStruct
 	bool eaVerifyProcessing = false
 	bool hasTeam
 	bool bIsTimedOut
+	bool b1v1SettingsSet
+	table< int, bool > isGroupChannelCreatedTbl
+	table< int, int > syncGroupToAssetForPlayer
 	
 	//for adding specific spawn behavior on a player basis.
 	array<void functionref(entity)> playerSpawnedCallbacks

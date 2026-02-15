@@ -257,6 +257,15 @@ void function Script_RegisterAllStats()
 			Tracker_RegisterStat( "realistic_kidnaps", null, TrackerStats_GetPortalKidnaps, STORE_STAT )
 		break
 		
+		case ePlaylists.fs_grapples_n_guns:
+			Tracker_RegisterStat( "grapples_n_guns_kills", null, Tracker_ReturnKills )
+			Tracker_RegisterStat( "grapples_n_guns_deaths", null, Tracker_ReturnDeaths )
+			Tracker_RegisterStat( "grapples_n_guns_grapples", null, GrapplesNGuns_ReturnGrapples )
+			Tracker_RegisterStat( "grapples_n_guns_headshots", null, GrapplesNGuns_ReturnHeadshots )
+			Tracker_RegisterStat( "grapples_n_guns_melees", null, GrapplesNGuns_ReturnMelees )
+			Tracker_RegisterStat( "grapples_n_guns_wins", null, GrapplesNGuns_ReturnWins )
+		break
+		
 		//case :
 	}
 }

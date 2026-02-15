@@ -7,6 +7,7 @@ global function Tracker_SetPlayerStatFloat
 global function Tracker_ResyncAllForPlayer
 global function Tracker_ResyncStatForPlayer
 
+global function Tracker_RegisterPreloadStats
 global function Tracker_StatRequestFailed
 global function Tracker_PreloadStatArray
 global function Tracker_PreloadStat
@@ -15,7 +16,7 @@ global function Tracker_StatExists
 
 global const float MAX_PRELOAD_TIMEOUT = 0.35
 
-typedef EntityStatStruct table < entity, table < string, var > >
+typedef PlayerStatStruct table < string, table < string, var > >
 const bool DEBUG_CL_STATS = false
 const float MAX_FETCH_TIMEOUT = 5.0
 
@@ -33,14 +34,14 @@ struct StatData
 
 struct
 {
-	EntityStatStruct playerStatTables
+	PlayerStatStruct playerStatTables
 	array<StatData> statDataQueue
 	table< entity, table<string, bool> > lockTable
 	table infoSignal
+	table< string, StatKeyData > _currentStatKey
+	array< string > registeredPreloadStats
 	
-	table< entity, StatKeyData > _currentStatKey
-	
-} file 
+} file
 
 // In order to use this feature on the client, 
 // stats need preloaded on the client before fetching.
@@ -66,11 +67,22 @@ void function Tracker_ClientStats_Init()
 	if( GetCurrentPlaylistVarBool( "disable_r5rdev_clientstats", false ) )
 		return
 	
+	AddCallback_OnPlayerConnected( OnPlayerJoined )
+	
 	thread ClientStats_Think()
 	
 	#if DEVELOPER && DEBUG_CL_STATS
 		printw( "NOTICE: DEBUG_CL_STATS is set to true in", FILE_NAME() )
 	#endif
+}
+
+void function Tracker_RegisterPreloadStats( array< string > statNames )
+{
+	foreach( string statName in statNames )
+	{
+		mAssert( !file.registeredPreloadStats.contains( statName ), "Stat \"%s\" was already registered for preload", statName )
+		file.registeredPreloadStats.append( statName )
+	}
 }
 
 void function Tracker_SetPlayerStatBool( entity player, bool value )
@@ -88,6 +100,18 @@ void function Tracker_SetPlayerStatFloat( entity player, float value )
 	Signal( file.infoSignal, "StatDataReceived", { value = value } )
 }
 
+void function OnPlayerJoined( entity newPlayer )
+{	
+	entity localPlayer = GetLocalClientPlayer()
+	if( !IsValid( newPlayer ) || localPlayer != GetLocalViewPlayer() )
+		return
+	
+	if( newPlayer == localPlayer )
+		Tracker_PreloadStatArray( GetPlayerArray(), file.registeredPreloadStats )
+	else
+		Tracker_PreloadStatArray( [ newPlayer ], file.registeredPreloadStats )
+}
+
 void function ClientStats_Think()
 {
 	FlagWait( "EntitiesDidLoad" )
@@ -99,6 +123,8 @@ void function ClientStats_Think()
 		
 		return
 	}
+	
+	OnPlayerJoined( GetLocalClientPlayer() )
 
 	for( ; ; )
 	{
@@ -142,11 +168,11 @@ void function __StatQueueRemoveDuplicatesAndInvalid()
 	table<string, bool> keyMap = {}
 	
 	foreach( StatData data in file.statDataQueue )
-	{	
+	{
 		if( !IsValid( data.player ) )
 			continue
 	
-		string key = format( "%s%s", data.player.GetPlatformUID(), data.statname )
+		string key = format( "%s_%s", data.player.GetPlatformUID(), data.statname )
 		
 		if( !( key in keyMap ) )
 		{
@@ -164,8 +190,9 @@ var function Tracker_FetchStat( entity player, string stat )
 		return null 
 		
 	ValidatePlayerStatTable( player )
+	string playerUID = player.GetPlatformUID()
 	
-	if( !( stat in file.playerStatTables[ player ] ) )
+	if( !( stat in file.playerStatTables[ playerUID ] ) )
 	{
 		#if DEVELOPER && DEBUG_CL_STATS
 			Warning( "Stat \"%s\" was not fetched for \"%s\" and is being preloaded now.", stat, string( player ) )
@@ -175,7 +202,7 @@ var function Tracker_FetchStat( entity player, string stat )
 	}
 	else
 	{
-		return file.playerStatTables[ player ][ stat ]
+		return file.playerStatTables[ playerUID ][ stat ]
 	}
 	
 	return null
@@ -269,27 +296,29 @@ var function __FetchPlayerStatInThread( entity player, string stat )
 		
 	ValidatePlayerStatTable( player )
 	
-	if( !( stat in file.playerStatTables[ player ] ) )
+	string playerUID = player.GetPlatformUID()	
+	if( !( stat in file.playerStatTables[ playerUID ] ) )
 	{
 		waitthread __RequestPlayerStat( player, stat )
 		WaitFrame()
 	}
 	
-	if( ( stat in file.playerStatTables[ player ] ) )
-		return file.playerStatTables[ player ][ stat ]
+	if( ( stat in file.playerStatTables[ playerUID ] ) )
+		return file.playerStatTables[ playerUID ][ stat ]
 		
 	return null
 }
 
 void function ValidatePlayerStatTable( entity player )
 {
-	if( !PlayerStatTableExists( player ) )
-		file.playerStatTables[ player ] <- {}	
+	string playerUID = player.GetPlatformUID()
+	if( !PlayerStatTableExists( playerUID ) )
+		file.playerStatTables[ playerUID ] <- {}	
 }
 
-bool function PlayerStatTableExists( entity player )
+bool function PlayerStatTableExists( string playerUID )
 {
-	return( player in file.playerStatTables )	
+	return( playerUID in file.playerStatTables )	
 }
 
 void function __RequestPlayerStat( entity player, string stat )
@@ -320,28 +349,29 @@ void function __RequestPlayerStat( entity player, string stat )
 	localPlayer.ClientCommand( format( "requestStat %s %s", string( player.GetEncodedEHandle() ), stat ) )
 	table statData = WaitSignal( file.infoSignal, "StatDataReceived", "RequestStatFailed" )
 	
+	string playerUID = player.GetPlatformUID()
 	if( expect string( statData.signal ) == "RequestStatFailed" )
-		__SetStatValue( player, stat, null )
+		__SetStatValue( playerUID, stat, null )
 	else
-		__SetStatValue( player, stat, statData.value )
+		__SetStatValue( playerUID, stat, statData.value )
 		
 	#if DEVELOPER && DEBUG_CL_STATS
-		printw( "Stat set for player: ", player, stat, "=", __GetStatValue( player, stat ) )
+		printw( "Stat set for player: ", player, "UID:", playerUID, " ", stat, "=", __GetStatValue( playerUID, stat ) )
 	#endif
 }
 
-void function __SetStatValue( entity player, string stat, var value )
+void function __SetStatValue( string playerUID, string stat, var value )
 {
-	if( stat in file.playerStatTables[ player ] )
-		file.playerStatTables[ player ][ stat ] = value
+	if( stat in file.playerStatTables[ playerUID ] )
+		file.playerStatTables[ playerUID ][ stat ] = value
 	else 
-		file.playerStatTables[ player ][ stat ] <- value
+		file.playerStatTables[ playerUID ][ stat ] <- value
 }
 
-var function __GetStatValue( entity player, string stat )
+var function __GetStatValue( string playerUID, string stat )
 {
-	if( stat in file.playerStatTables[ player ] )
-		return file.playerStatTables[ player ][ stat ]
+	if( stat in file.playerStatTables[ playerUID ] )
+		return file.playerStatTables[ playerUID ][ stat ]
 	else 
 		return null 
 		
@@ -359,22 +389,28 @@ void function Tracker_StatRequestFailed()
 
 bool function Tracker_StatExists( entity player, string statname )
 {
-	if( !( player in file.playerStatTables ) )
+	string playerUID = player.GetPlatformUID()
+	if( !( playerUID in file.playerStatTables ) )
 		return false 
 	
-	return ( statname in file.playerStatTables[ player ] )
+	return ( statname in file.playerStatTables[ playerUID ] )
 }
 
 void function Tracker_ResyncAllForPlayer( entity remotePlayer ) //this is more expensive. if only updating one key, call "Tracker_ResyncStatForPlayer" on server instead
 {
-	if( PlayerStatTableExists( remotePlayer ) )
+	if( !IsValid( remotePlayer ) )
+		return 
+		
+	string remotePlayerUID = remotePlayer.GetPlatformUID()
+	
+	if( PlayerStatTableExists( remotePlayerUID ) )
 	{
 		array<string> resyncKeys
 		
-		foreach( string statKey, var statValue in file.playerStatTables[ remotePlayer ]  )
+		foreach( string statKey, var statValue in file.playerStatTables[ remotePlayerUID ]  )
 			resyncKeys.append( statKey )
 		
-		file.playerStatTables[ remotePlayer ] = {}
+		file.playerStatTables[ remotePlayerUID ] = {}
 		
 		foreach( int idx, string key in resyncKeys )
 			__AddToStatQueue( remotePlayer, key )
@@ -389,12 +425,14 @@ void function Tracker_ResyncStatForPlayer( int remotePlayerEHandle, ... )
 	if( !IsValid( remotePlayer ) )
 		return
 	
-	__CheckCurrentStatKey( remotePlayer )
+	string remotePlayerUID = remotePlayer.GetPlatformUID()
 	
-	if( file._currentStatKey[ remotePlayer ]._bkeyInProcess )
+	__CheckCurrentStatKey( remotePlayerUID )
+	
+	if( file._currentStatKey[ remotePlayerUID ]._bkeyInProcess )
 		return
 	
-	file._currentStatKey[ remotePlayer ]._bkeyInProcess = true
+	file._currentStatKey[ remotePlayerUID ]._bkeyInProcess = true
 			
 	int charCount = expect int( vargc )
 	array chars = [ this, RepeatString( "%c", charCount ) ]
@@ -402,29 +440,30 @@ void function Tracker_ResyncStatForPlayer( int remotePlayerEHandle, ... )
 	for( int i = 0; i < vargc; i++ )
 		chars.append( vargv[ i ] )
 		
-	file._currentStatKey[ remotePlayer ]._currentKey = expect string( format.acall( chars ) )
+	file._currentStatKey[ remotePlayerUID ]._currentKey = expect string( format.acall( chars ) )
 	
-	string currentKey = file._currentStatKey[ remotePlayer ]._currentKey
+	string currentKey = file._currentStatKey[ remotePlayerUID ]._currentKey
 	
-	if( currentKey in file.playerStatTables[ remotePlayer ] )
-	{
-		delete file.playerStatTables[ remotePlayer ][ currentKey ]
-		Tracker_PreloadStat( remotePlayer, currentKey )
-	}
+	ValidatePlayerStatTable( remotePlayer )
 	
-	file._currentStatKey[ remotePlayer ]._currentKey 	= ""
-	file._currentStatKey[ remotePlayer ]._bkeyInProcess = false
+	if( currentKey in file.playerStatTables[ remotePlayerUID ] )
+		delete file.playerStatTables[ remotePlayerUID ][ currentKey ]
+	
+	Tracker_PreloadStat( remotePlayer, currentKey )
+	
+	file._currentStatKey[ remotePlayerUID ]._currentKey 	= ""
+	file._currentStatKey[ remotePlayerUID ]._bkeyInProcess 	= false
 }
 
-void function __CheckCurrentStatKey( entity remotePlayer )
+void function __CheckCurrentStatKey( string remotePlayerUID )
 {
-	if( !( remotePlayer in file._currentStatKey ) )
+	if( !( remotePlayerUID in file._currentStatKey ) )
 	{
 		StatKeyData data 
 		
 		data._currentKey 	= ""
 		data._bkeyInProcess = false
 		
-		file._currentStatKey[ remotePlayer ] <- data
+		file._currentStatKey[ remotePlayerUID ] <- data
 	}
 }

@@ -13,7 +13,7 @@ const vector TTV_BUILDING_ORIGIN = < 9864.35, 5497.93, -3567.97 >
 const float TTV_BUILDING_RADIUS = 4500.0
 const float DOOR_RESPAWN_PLAYER_RADIUS_LIMIT = 130.0
 const float DOOR_REGEN_GRACE = 60
-const int HIGH_PLAYER_COUNT_THRESHOLD = 15
+const int HIGH_PLAYER_COUNT_THRESHOLD = 6
 
 const array<string> STANDARD_REALISTIC_KILL_LOOT = 
 [
@@ -51,7 +51,10 @@ struct DoorDataStruct
 struct 
 {
 	array< SpawnData > gamemodeSpawns
+	array< SpawnData > aiSpawns
 	array< DoorDataStruct > trackedDoors
+	array< entity > aiBots
+	array< entity > aiBotsForPlayers
 	table< entity, ItemFlavor ornull > tbl_selectedLegends
 	
 	int iTrackedDoors
@@ -59,6 +62,9 @@ struct
 	float fRandomDummySpawnMaxTime
 	bool bLegendChangeEnabled
 	bool bAllowLegendAbilities
+	bool bEnableTrainingMode
+	
+	table infoSignal
 
 } file 
 
@@ -68,12 +74,12 @@ void function RealisticMode_Init()
 	
 	AddCallback_EntitiesDidLoad( InitializeDoorTracking )
 	AddCallback_OnPlayerWeaponAttachmentChanged( Realistic_OnWeaponAttachmentChanged )
-	AddCallback_OnPlayerRespawned( RealisticMode_OnSpawned )
+	AddFSCallback_OnRespawned( RealisticMode_OnSpawned )
 
 	SpawnSystem_InitGamemodeOptions()
 	
-	int eMap = SpawnSystem_FindBaseMapForPak( MapName() )
-	file.gamemodeSpawns = SpawnSystem_ReturnAllSpawnLocations( eMap )
+	int eMap 				= SpawnSystem_FindBaseMapForPak( MapName() )
+	file.gamemodeSpawns 	= SpawnSystem_ReturnAllSpawnLocations( eMap )
 	
 	mAssert( file.gamemodeSpawns.len() > 0, "No valid spawns configured" )
 	
@@ -84,13 +90,36 @@ void function RealisticMode_Init()
 	if ( !FlowState_AdminTgive() )
 		INIT_WeaponsMenu()
 	else 
-		INIT_WeaponsMenu_Disabled()
+		INIT_WeaponsMenu_Disabled()	
 		
 	if( GetCurrentPlaylistVarBool( "random_dummy_spawn", true ) )
-	{
+	{	
 		file.fRandomDummySpawnMinTime = GetCurrentPlaylistVarFloat( "random_dummy_spawn_mintime", 100.0 )
 		file.fRandomDummySpawnMaxTime = GetCurrentPlaylistVarFloat( "random_dummy_spawn_maxtime", 250.0 )
 		thread SpawnDummyOnRandomPlayer_Thread()
+	}
+	
+	file.bEnableTrainingMode = GetCurrentPlaylistVarBool( "realistic_ttv_ai_training_feature", false )
+	
+	if( file.bEnableTrainingMode )
+	{
+		file.aiSpawns = SpawnSystem_ReturnAllSpawnLocationsFromDatatable( "datatable/fs_spawns_realistic_ai.rpak" )
+		
+		if( file.aiSpawns.len() == 0 )
+			mAssert( 0, "Tried to launch 'ai_training_mode' but there are no valid ai spawns" )
+		
+		RegisterSignal( "RealisticTTV_KillTrainingThread" )
+		RegisterSignal( "RealisticTTV_SpawnTrainingDummy" )
+		AddClientCommandCallbackVoid( "training", ClientCommand_RealisticTrainingMode )
+		
+		if( GetCurrentPlaylistVarBool( "realistic_ttv_ai_training_mode_auto_start", false ) )
+			thread AiTrainingModeThread()
+	}
+	
+	if( file.bEnableTrainingMode || GetCurrentPlaylistVarBool( "random_dummy_spawn", true ) )
+	{
+		AddCallback_OnTdmStateEnter_InProgress( DummyResetIfAlive )
+		AddCallback_OnTdmStateEnter_EndGame( DummyPauseAggro )
 	}
 	
 	file.bLegendChangeEnabled = GetCurrentPlaylistVarBool( "allow_legend_select", false )
@@ -157,7 +186,19 @@ void function SpawnDummyOnRandomPlayer_Thread()
 	for( ; ; )
 	{
 		wait RandomFloatRange( file.fRandomDummySpawnMinTime, file.fRandomDummySpawnMaxTime )
-		waitthread __SpawnDummy()
+		
+		if( !GetPlayerArray().len() )
+			continue
+			
+		entity player = GetPlayerArray().getrandom()
+
+		vector origin = GetPlayerCrosshairOrigin( player )
+		vector org2 = player.GetOrigin()
+		vector vec1 = org2 - origin
+		vector angles = VectorToAngles( vec1 )
+		angles.x = 0
+		
+		waitthread __SpawnDummy( origin, angles, player )
 	}
 }
 
@@ -353,8 +394,15 @@ void function RealisticMode_GivePlayerBonusHeals( entity player, bool spawn = fa
 {
 	if( !spawn )
 	{
+		vector playerOriginAtKillTime = player.GetOrigin()
+		
 		foreach( ref in STANDARD_REALISTIC_KILL_LOOT )
-			SURVIVAL_AddToPlayerInventory( player, ref, 1 )
+		{
+			if( SURVIVAL_AddToPlayerInventory( player, ref, 1, false ) == 0 )
+				SpawnLoot( ref, playerOriginAtKillTime, true )
+			else
+				SURVIVAL_AddToPlayerInventory( player, ref, 1 )
+		}
 	}
 	else
 	{
@@ -372,51 +420,37 @@ void function Realistic_OnWeaponAttachmentChanged( entity player, entity weapon,
 }
 
 void function RealisticMode_OnSpawned( entity player )
-{
-	thread
-	(
-		void function() : ( player )
-		{
-			if( !IsValid( player ) )
+{		
+	Inventory_SetPlayerEquipment( player, "", "helmet" )
+	player.TakeOffhandWeapon( OFFHAND_SLOT_FOR_CONSUMABLES )
+	player.TakeNormalWeaponByIndexNow( WEAPON_INVENTORY_SLOT_PRIMARY_2 )
+	player.TakeOffhandWeapon( OFFHAND_MELEE )
+
+	RealisticMode_GivePlayerBonusHeals( player, true )	
+	
+	bool bHasValidLegend
+	if( file.bLegendChangeEnabled )
+	{
+		if( ( player in file.tbl_selectedLegends ) && file.tbl_selectedLegends[ player ] != null )
+		{		
+			ItemFlavor ornull character = file.tbl_selectedLegends[ player ]
+			if( character == null )
 				return
 				
-			player.EndSignal( "OnDestroy", "OnDeath" )	
-			wait 3 //todo, unweave fsdm logic
-			
-			Inventory_SetPlayerEquipment( player, "", "helmet" )
-			player.TakeOffhandWeapon( OFFHAND_SLOT_FOR_CONSUMABLES )
-			player.TakeNormalWeaponByIndexNow( WEAPON_INVENTORY_SLOT_PRIMARY_2 )
-			player.TakeOffhandWeapon( OFFHAND_MELEE )
-			
-			WaitFrame()
-
-			RealisticMode_GivePlayerBonusHeals( player, true )	
-			
-			bool bHasValidLegend
-			if( file.bLegendChangeEnabled )
-			{
-				if( ( player in file.tbl_selectedLegends ) && file.tbl_selectedLegends[ player ] != null )
-				{		
-					ItemFlavor ornull character = file.tbl_selectedLegends[ player ]
-					if( character == null )
-						return
-						
-					bHasValidLegend = true	
-					expect ItemFlavor ( character )
-					CharacterSelect_AssignCharacter( ToEHI( player ), character )
-				}
-			}
-			
-			if( file.bAllowLegendAbilities && bHasValidLegend )
-				GiveLoadoutRelatedWeapons( player )
-			else
-			{
-				player.GiveOffhandWeapon( CONSUMABLE_WEAPON_NAME, OFFHAND_SLOT_FOR_CONSUMABLES, [] )
-				player.GiveWeapon( "mp_weapon_melee_survival", WEAPON_INVENTORY_SLOT_PRIMARY_2, [] )
-				player.GiveOffhandWeapon( "melee_pilot_emptyhanded", OFFHAND_MELEE, [] )
-			}
+			bHasValidLegend = true	
+			expect ItemFlavor ( character )
+			CharacterSelect_AssignCharacter( ToEHI( player ), character )
 		}
-	)()
+	}
+	
+	if( file.bAllowLegendAbilities && bHasValidLegend )
+		GiveLoadoutRelatedWeapons( player )
+	else
+	{
+		player.GiveOffhandWeapon( CONSUMABLE_WEAPON_NAME, OFFHAND_SLOT_FOR_CONSUMABLES, [] )
+		player.GiveWeapon( "mp_weapon_melee_survival", WEAPON_INVENTORY_SLOT_PRIMARY_2, [] )
+		player.GiveOffhandWeapon( "melee_pilot_emptyhanded", OFFHAND_MELEE, [] )
+	}
 }
 
 //taken from fsdm, similar function
@@ -472,21 +506,124 @@ bool function MessagePlayer_Disabled( entity player, array<string> args )
 	return true
 }
 
-void function __SpawnDummy( int team = 99 ) //taken from ai util
+void function ClientCommand_RealisticTrainingMode( entity player, array< string > args )
 {
-	if( !GetPlayerArray().len() )
+	if( !IsValid( player ) )
+		return 
+	
+	if( !file.bEnableTrainingMode )	
+		return
+		
+	if( !IsServerAdmin( player.p.UID ) )
 		return 
 		
-	entity player = GetPlayerArray().getrandom()
-
-	vector origin = GetPlayerCrosshairOrigin( player )
-	vector org2 = player.GetOrigin()
-	vector vec1 = org2 - origin
-	vector angles1 = VectorToAngles( vec1 )
-	angles1.x = 0
+	if( !args.len() )
+		return 
+		
+	string param = args [ 0 ]
+	if( !IsStringBool( param ) )
+	{
+		Message( player, "Error", format( "Param \"%s\" is not a valid bool representation", param ) )
+		return
+	}
 	
-	entity dummy = CreateDummy( team, origin, angles1 )
-	SetSpawnOption_AISettings( dummy, "npc_dummie_combat" )
+	bool enable = StringToBool( args[ 0 ] )
+	
+	if( enable )
+		thread AiTrainingModeThread()
+	else 
+		Signal( file.infoSignal, "RealisticTTV_KillTrainingThread" )
+	
+	foreach( s_player in GetPlayerArray() )
+		Message( s_player, "Game State Change", format( "TTV Realistic training mode was %s", enable ? "enabled" : "disabled" ) )
+}
+
+void function AiTrainingModeThread()
+{
+	mAssert( IsNewThread(), "Must be threaded off" )
+	
+	OnThreadEnd
+	(
+		void function()
+		{
+			foreach( entity bot in file.aiBots )
+			{
+				if( IsValid( bot ) )
+					bot.Destroy()
+			}
+			
+			file.aiBots.clear()
+		}
+	)
+	
+	Signal( file.infoSignal, "RealisticTTV_KillTrainingThread" )
+	EndSignal( file.infoSignal, "RealisticTTV_KillTrainingThread" )
+	
+	float fSpawnGracePeriod	= GetCurrentPlaylistVarFloat( "realistic_ttv_dummy_spawn_grace_period", 4 )
+	int maxAllowedBots 		= GetCurrentPlaylistVarInt( "realistic_ttv_max_alive_bots", 2 )
+	int currentAliveDummies = file.aiBots.len()
+	entity dummy
+	SpawnData dummySpawn
+	
+	for( ; ; )
+	{
+		currentAliveDummies = file.aiBots.len()
+		
+		if( currentAliveDummies >= maxAllowedBots )
+		{
+			WaitSignal( file.infoSignal, "RealisticTTV_SpawnTrainingDummy" )
+			wait fSpawnGracePeriod
+		}
+		
+		dummySpawn = file.aiSpawns.getrandom()
+		dummy = CreateDummy( 99, dummySpawn.spawn.origin, dummySpawn.spawn.angles )
+		
+		file.aiBots.append( dummy )
+		AddEntityCallback_OnKilled( dummy, OnTrainingDummyKilled )
+		
+		__SpawnDummy( dummySpawn.spawn.origin, dummySpawn.spawn.angles, null, dummy, 99, 0.8, 2.3 )	
+	}
+}
+
+void function OnTrainingDummyKilled( entity dummy, var damageInfo )
+{
+	if( IsValid( dummy ) )
+	{
+		file.aiBots.fastremovebyvalue( dummy )
+	
+		entity attacker = DamageInfo_GetAttacker( damageInfo )
+		
+		if( IsValid( attacker ) && attacker.IsPlayer() )
+			RealisticMode_GivePlayerBonusHeals( attacker )
+		
+		dummy.Destroy()
+	}
+
+	Signal( file.infoSignal, "RealisticTTV_SpawnTrainingDummy" )
+}
+
+void function OnDummyKilledForPlayer( entity dummy, var damageInfo )
+{
+	if( IsValid( dummy ) )
+	{
+		file.aiBotsForPlayers.fastremovebyvalue( dummy )
+		
+		entity attacker = DamageInfo_GetAttacker( damageInfo )
+		
+		if( IsValid( attacker ) && attacker.IsPlayer() )
+			RealisticMode_GivePlayerBonusHeals( attacker )
+			
+		dummy.Destroy()
+	}
+}
+
+void function __SpawnDummy( vector origin, vector angles, entity player = null, entity dummy = null, int team = 99, float fWaitMin = 2.0, float fWaitMax = 5.0 ) //taken from ai util
+{	
+	if ( dummy == null )
+		dummy = CreateDummy( team, origin, angles )
+		
+	dummy.e.stateFlags = 0 | STATE_FLAG_NO_STATS
+	SetSpawnOption_AISettings( dummy, "npc_combat_wraith" )
 
 	int shield = 100
 	int shieldskin = 1
@@ -503,10 +640,20 @@ void function __SpawnDummy( int team = 99 ) //taken from ai util
 	dummy.SetValidHealthBarTarget( true )
 	SetObjectCanBeMeleed( dummy, true )
 	dummy.DisableHibernation()
-	dummy.SetAngles(angles1)
+	dummy.SetAngles( angles )
 	dummy.SetEfficientMode( false )
-	dummy.RemoveFromAllRealms()
-	dummy.AddToOtherEntitysRealms( player )
+	dummy.SetSkin( RandomInt(6) )
+	dummy.EnableNPCMoveFlag( NPCMF_PREFER_SPRINT )
+	dummy.SetTitle( "Wraith Killer" )
+	
+	if( player != null )
+	{
+		dummy.RemoveFromAllRealms()
+		dummy.AddToOtherEntitysRealms( player )
+		
+		AddEntityCallback_OnKilled( dummy, OnDummyKilledForPlayer )
+		file.aiBotsForPlayers.append( dummy )
+	}
 
     array<string> weapons = ["npc_weapon_hemlok", "npc_weapon_energy_shotgun", "npc_weapon_lstar"]
     string randomWeapon = weapons[ RandomInt( weapons.len() ) ]
@@ -517,6 +664,45 @@ void function __SpawnDummy( int team = 99 ) //taken from ai util
 	dummy.GiveWeapon( randomWeapon, WEAPON_INVENTORY_SLOT_ANY )
 	
 	dummy.EnableNPCFlag( NPC_IGNORE_ALL )
-	wait RandomFloatRange( 2.0, 5.0 )
-	dummy.DisableNPCFlag( NPC_IGNORE_ALL )
+	wait RandomFloatRange( fWaitMin, fWaitMax )
+	
+	if( IsValid( dummy ) )
+	{
+		dummy.DisableNPCFlag( NPC_IGNORE_ALL )
+		dummy.EnableNPCFlag( NPC_USE_SHOOTING_COVER | NPC_CROUCH_COMBAT )
+	}
+}
+
+array<entity> function GetAllDummies() //not using GetNPCArrayByClass( "npc_dummie" ) incase we add other classes later
+{
+	array<entity> allDummies
+	
+	allDummies.extend( file.aiBots )
+	allDummies.extend( file.aiBotsForPlayers )
+	
+	return allDummies
+}
+
+void function DummyResetIfAlive()
+{
+	foreach( entity dummy in GetAllDummies() )
+	{
+		if( IsValid( dummy ) && IsAlive( dummy ) )
+			dummy.Destroy()
+	}
+	
+	file.aiBots.clear()
+	file.aiBotsForPlayers.clear()
+}
+
+void function DummyPauseAggro()
+{
+	foreach( entity dummy in GetAllDummies() )
+	{
+		if( IsValid( dummy ) && IsAlive( dummy ) )
+		{
+			dummy.Freeze()
+			dummy.EnableNPCFlag( NPC_IGNORE_ALL | NPC_DISABLE_SENSING )
+		}
+	}
 }

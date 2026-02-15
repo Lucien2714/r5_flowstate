@@ -26,17 +26,26 @@ void function LeaveMatch()
 void function LoadLobbyAfterLeave()
 {
 	#if LISTEN_SERVER
-	CancelMatchmaking()
-	ClientCommand( "LeaveMatch" )
+		uiGlobal.bIsAutoLoadingLobby = true
+		OnThreadEnd
+		(
+			void function()
+			{
+				uiGlobal.bIsAutoLoadingLobby = false
+			}
+		)
+		
+		CancelMatchmaking()
+		ClientCommand( "LeaveMatch" )
 
-	// Wait a second for a smoother transition
-	wait 1
+		// Wait a second for a smoother transition
+		wait 1
 
-	// Create the lobby server
-	CreateServer("Lobby VM", "", "mp_lobby", "dev_default", eServerVisibility.OFFLINE)
+		// Create the lobby server
+		CreateServer( "Lobby VM", "", "mp_lobby", "dev_default", eServerVisibility.OFFLINE )	
 	#else
 
-	// !TODO: attempt to connect to a lobby dedi from here???
+		// !TODO: attempt to connect to a lobby dedi from here???
 
 	#endif // LISTEN_SERVER
 }
@@ -47,7 +56,7 @@ void function LeaveParty()
 	Signal( uiGlobal.signalDummy, "LeaveParty" )
 }
 
-void function LeaveMatchAndParty()
+void function LeaveMatchAndParty() //(mk): not called
 {
 	LeaveParty()
 	LeaveMatchWithDialog()

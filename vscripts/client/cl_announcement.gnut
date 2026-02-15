@@ -590,7 +590,7 @@ void function Announcements_SetEnabled( bool state )
 }
 
 
-void function UIToClient_Notification( string titleText, string messageText )
+void function UIToClient_Notification( string titleText, string messageText, float delay = 3.0 )
 {
 	Signal( clGlobal.signalDummy, "UIToClient_Notification" )
 	var notificationBox = HudElement( "NotificationBox" )
@@ -600,7 +600,7 @@ void function UIToClient_Notification( string titleText, string messageText )
 	RuiSetString( rui, "messageText", messageText )
 	Hud_Show( notificationBox )
 
-	thread HideNotificationInABit( notificationBox, 3.0 )
+	thread HideNotificationInABit( notificationBox, delay )
 }
 
 

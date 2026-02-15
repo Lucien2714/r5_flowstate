@@ -18,9 +18,9 @@ void function SV_CL_Shared_Init()
 		return
 	}
 	
-	#if SERVER || UI
-		UIVars_Init()
-	#endif 
+	#if SERVER
+		UIVars_Init() //(mk): also called by UICodeCallback_UIInit for UI context
+	#endif
 
 	SV_CL_Init()
 

@@ -122,13 +122,19 @@ void function ClientToUI_ToggleScoreboard()
 	
 	if ( IsSurvivalTraining() )
 	{
-		printf( "%s() - Aborting, because we're in Training.", FUNC_NAME() )
+		#if DEVELOPER
+			printf( "%s() - Aborting, because we're in Training.", FUNC_NAME() )
+		#endif
+		
 		return
 	}
 
 	if ( IsFiringRangeGameMode() )
 	{
-		printf( "%s() - Showing character select because we're in Firing Range.", FUNC_NAME() )
+		#if DEVELOPER
+			printf( "%s() - Showing character select because we're in Firing Range.", FUNC_NAME() )
+		#endif 
+		
 		RunUIScript( "TryCloseSurvivalInventory", null )
 		EmitSoundOnEntity( GetLocalViewPlayer(), "UI_Menu_accept" )
 		OpenCharacterSelectNewMenu( true )
@@ -160,24 +166,30 @@ bool function TPPromptIsActive()
 	return (clGlobal.isScoreboardShown && s_latestShowWasForTPPrompt)
 }
 
+bool function ShouldShowScoreboard()
+{
+	if ( GetGameState() >= eGameState.WinnerDetermined )
+		return false
+	else if ( IsViewingSquadSummary() || IsViewingDeathRecap() )
+		return false
+	else if ( GetGameState() < eGameState.Playing && !GetCurrentPlaylistVarBool( "survival_staging_area_enabled", false ) )
+		return false
+	
+	return file.wantsToShowScoreboard
+}
+
 void function UpdateScoreboardVisibility()
 {
 	bool wantsTPPrompt = s_nextShowWantsTPPrompt
 	s_nextShowWantsTPPrompt = false
 
-	bool shouldShow = file.wantsToShowScoreboard
-	if ( GetGameState() >= eGameState.WinnerDetermined )
-		shouldShow = false
-	else if ( IsViewingSquadSummary() || IsViewingDeathRecap() )
-		shouldShow = false
-	else if ( GetGameState() < eGameState.Playing && !GetCurrentPlaylistVarBool( "survival_staging_area_enabled", false ) )
-		shouldShow = false
-
+	bool shouldShow = ShouldShowScoreboard()
 	file.wantsToShowScoreboard = shouldShow // Don't treat "wants to show" as a queue. It's more like an argument to this function.
 
 	if ( shouldShow == IsScoreboardShown() )
 		return // If we're already in the correct state, do nothing.
 
+	//Warning( "Setting should show to: " + ( shouldShow ? "true" : "false" ) )
 	clGlobal.isScoreboardShown = shouldShow
 
 	if ( shouldShow )
@@ -189,11 +201,11 @@ void function UpdateScoreboardVisibility()
 		foreach ( func in file.scoreboardShowCallbacks )
 			func()
 
-		// thread clGlobal.showScoreboardFunc() //don't show scoreboard in fullmap it looks bad
+		thread clGlobal.showScoreboardFunc() //don't show scoreboard in fullmap it looks bad   //(mk): If you don't want scoreboard in full map, you add a callback with AddScoreboardShowCallback to control the behavior, not break the scoreboard system. 
 	}
 	else
 	{
-		// thread clGlobal.hideScoreboardFunc()
+		thread clGlobal.hideScoreboardFunc()
 
 		RunUIScript( "SetShowingMap", false )
 
@@ -207,6 +219,7 @@ void function UpdateScoreboardVisibility()
 #if CLIENT
 void function AddScoreboardShowCallback( void functionref() func )
 {
+	mAssert( !file.scoreboardShowCallbacks.contains( func ), "Tried to add callback %s with %s but it was already added", string( func ), FUNC_NAME() )
 	file.scoreboardShowCallbacks.append( func )
 }
 #endif
@@ -215,6 +228,7 @@ void function AddScoreboardShowCallback( void functionref() func )
 #if CLIENT
 void function AddScoreboardHideCallback( void functionref() func )
 {
+	mAssert( !file.scoreboardHideCallbacks.contains( func ), "Tried to add callback %s with %s but it was already added", string( func ), FUNC_NAME() )
 	file.scoreboardHideCallbacks.append( func )
 }
 #endif

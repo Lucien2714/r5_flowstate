@@ -102,8 +102,8 @@ global function SetNextCircleDisplayCustomClear
 global function SetChampionScreenRuiAsset
 global function InitSurvivalHealthBar
 #if DEVELOPER
-global function Dev_ShowVictorySequence
-global function Dev_AdjustVictorySequence
+	global function Dev_ShowVictorySequence
+	global function Dev_AdjustVictorySequence
 #endif
 
 global function ChangeHUDVisibilityWhenInCryptoDrone
@@ -119,6 +119,8 @@ global function ServerCallback_Scenarios_MatchEndAnnouncement
 global function FS_ForceCompass
 global function FS_DestroyCompass
 global function AddInWorldMinimapObject
+
+global function FS_ShouldHookMapKey
 
 global struct NextCircleDisplayCustomData
 {
@@ -2070,18 +2072,19 @@ bool function MapDevCheatsAreActive()
 
 void function UpdateMap_THREAD()
 {
-	EndSignal( clGlobal.signalDummy, "OnHideScoreboard" )
-
 	Fullmap_SetVisible( true )
 	UpdateMainHudVisibility( GetLocalViewPlayer() )
 
-	OnThreadEnd(
-		function() : ()
+	OnThreadEnd
+	(
+		void function() : ()
 		{
 			Fullmap_SetVisible( false )
 			UpdateMainHudVisibility( GetLocalViewPlayer() )
 		}
 	)
+	
+	EndSignal( clGlobal.signalDummy, "OnHideScoreboard" )
 
 	for ( ; ; )
 	{
@@ -2140,18 +2143,26 @@ void function ChangeFullMapZoomFactor( float delta )
 	}
 }
 
-
+const array<int> SHOULD_HOOK_MAP_KEY =
+[
+	ePlaylists.fs_1v1, 
+	ePlaylists.fs_lgduels_1v1, 
+	ePlaylists.fs_vamp_1v1,
+	ePlaylists.fs_snd, 
+	ePlaylists.fs_dm,
+	ePlaylists.fs_dm_fast_instagib,
+	ePlaylists.fs_realistic_ttv,
+	ePlaylists.fs_grapples_n_guns
+	
+	//ePlaylists.fs_scenarios
+]
 bool function FS_ShouldHookMapKey() 
 {
-	if( Flowstate_IsHaloMode() && Playlist() != ePlaylists.fs_haloMod_survival && GetGameState() == eGameState.Playing
+	if
+	( 	
+		Flowstate_IsHaloMode() && Playlist() != ePlaylists.fs_haloMod_survival && GetGameState() == eGameState.Playing
 		|| Gamemode() == eGamemodes.CUSTOM_CTF && GetGameState() == eGameState.Playing 
-		|| Playlist() == ePlaylists.fs_1v1 
-		|| Playlist() == ePlaylists.fs_lgduels_1v1  
-		|| Playlist() == ePlaylists.fs_snd 
-		|| Playlist() == ePlaylists.fs_dm
-		|| Playlist() == ePlaylists.fs_dm_fast_instagib
-		|| Playlist() == ePlaylists.fs_realistic_ttv
-		// || Playlist() == ePlaylists.fs_scenarios
+		|| SHOULD_HOOK_MAP_KEY.contains( Playlist() )
 	)
 		return true
 	

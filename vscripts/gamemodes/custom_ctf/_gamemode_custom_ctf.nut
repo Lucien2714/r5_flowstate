@@ -112,7 +112,7 @@ void function _CustomCTF_Init()
 	RegisterSignal( "EndScriptedPropsThread" )
 	RegisterSignal( "FlagPhysicsEnd" )
 	
-	BannerAssets_Init()
+	WorldAssets_Init()
 	
 	AddCallback_OnClientConnected( void function(entity player) { thread _OnPlayerConnected(player) } )
 	AddCallback_OnClientDisconnected( void function(entity player) { thread _OnPlayerDisconnected(player) } )

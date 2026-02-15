@@ -57,6 +57,10 @@ global function SpawnSystem_GetPakInfoForKey				// string function SpawnSystem_G
 	devAutoSave				//bool 
 */
 
+global function SpawnSystem_ReturnAllSpawnLocationsFromDatatable	 // ( string dataTable = "" )
+/*
+	Can provide a custom datatable such as:  "datatable/mycustom.rpak"
+*/
 
 
 /*
@@ -419,7 +423,7 @@ global function SpawnSystem_GetPakInfoForKey				// string function SpawnSystem_G
 					["....."] = "",
 					[" script DEV_SpawnsPlaylist( string playlist = \"\" ) "] = "Sets the playlist this spawn pak should load for. This will also automatically apply the values saved in the playlists_r5_patch.txt for the specified playlist.",
 					[" script DEV_SetAutoSave( bool value = true )"] = "Disabled by default. Make sure folder 'spawns' in r5reloaded/platform exists",
-					[" script DEV_LoadPak( string pak = \"\", string playlist = \"\" )"] = "Loads spawn pak specifying rpak asset and playlist. If none provided, loads current pak. If custom spawns are wrote into the script test function, it loads those instead.",
+					[" script DEV_LoadPak( string pak = \"\", string playlist = \"\", int preferred = -1 )"] = "Loads spawn pak specifying rpak asset and playlist, and preferred set. If none provided, loads current pak. If custom spawns are wrote into the script test function, it loads those instead.",
 					[" script DEV_SpawnType( string setToType = \"\" )"] = "Params: \"csv\" or \"sq\" Sets/Converts the current array of print outs to specified type, and further additions are added as the specified type. Returns the current type if no parameters are provided. ( call with printt() )",
 					[" script DEV_SetTeamCount( int size )"] = "Sets the count of teams per spawn set formatting the PrintSpawns() array",
 					[" script DEV_PanelInfo( bool setting = true )"] = "true/false, sets whether info panels show or not. On by default.",
@@ -542,12 +546,14 @@ void function SpawnSystem_InitGamemodeOptions()
 	string customRpak 			= GetCurrentPlaylistVarString( "custom_spawnpak", "" )
 	string customSpawnPlaylist	= GetCurrentPlaylistVarString( "custom_playlist_spawnpak", "" )
 	bool use_custom_playlist 	= !empty( customSpawnPlaylist )
+	bool rotate_all				= GetCurrentPlaylistVarBool( "spawnpaks_rotate_all", false )
 	
-	settings.spawnOptions[ "use_sets" ] 			<- use_random || prefer
+	settings.spawnOptions[ "use_sets" ] 			<- use_random || prefer || rotate_all
 	settings.spawnOptions[ "use_random" ] 			<- use_random
 	settings.spawnOptions[ "prefer" ] 				<- prefer
-	settings.spawnOptions[ "use_custom_rpak" ] 		<- SpawnSystem_SetCustomPak( customRpak ) //returns 0 on failed rpak
+	settings.spawnOptions[ "use_custom_rpak" ] 		<- SpawnSystem_SetCustomPak( customRpak ) //returns false on failed rpak
 	settings.spawnOptions[ "use_custom_playlist" ] 	<- use_custom_playlist
+	settings.spawnOptions[ "rotate_all" ]			<- rotate_all
 	
 	if( use_custom_playlist )
 		SpawnSystem_SetCustomPlaylist( customSpawnPlaylist )
@@ -566,6 +572,32 @@ void function SpawnSystem_InitGamemodeOptions()
 	settings.bOptionsAreSet = true
 }
 
+array<SpawnData> function SpawnSystem_ReturnAllSpawnLocationsFromDatatable( string dataTable = "" )
+{
+	bool bCustomPakIsValid = SpawnSystem_SetCustomPak( dataTable )
+	if( !bCustomPakIsValid )
+		mAssert( 0, "Invalid datatable: \"%s\"", dataTable )
+
+	table< string, bool > options 
+	{
+		options[ "use_sets" ] 				<- false
+		options[ "use_random" ] 			<- false
+		options[ "prefer" ] 				<- false
+		options[ "use_custom_rpak" ] 		<- bCustomPakIsValid
+		options[ "use_custom_playlist" ] 	<- false
+		options[ "rotate_all" ]				<- false
+	}
+	
+	bool bRunCallbacks = file.bRunCallbacks
+	if( bRunCallbacks )
+		file.bRunCallbacks = false
+		
+	array<SpawnData> spawns = SpawnSystem_ReturnAllSpawnLocations( -1, options )	
+	file.bRunCallbacks = bRunCallbacks
+	
+	return spawns
+}
+
 array<SpawnData> function SpawnSystem_ReturnAllSpawnLocations( int eMap = -1, table<string,bool> options = {} )
 {
 	mAssert( settings.bOptionsAreSet, "Tried to fetch spawns without first running SpawnSystem_InitGamemodeOptions()" )
@@ -575,6 +607,7 @@ array<SpawnData> function SpawnSystem_ReturnAllSpawnLocations( int eMap = -1, ta
 		options = settings.spawnOptions
 		
 		#if DEVELOPER
+			Warning( "Options were not valid in %s()", FUNC_NAME() )
 			foreach( setting, value in options )
 				printt( "[SpawnSystem] Spawn setting:", setting, " Value:", value )
 		#endif
@@ -622,15 +655,17 @@ array<SpawnData> function SpawnSystem_ReturnAllSpawnLocations( int eMap = -1, ta
 					try
 					{
 						setpaks = StringToArray( currentMapSpawnSets )
-						for( int i = 0; i < setpaks.len(); i++ )
+						
+						int setpaksLen = setpaks.len()					
+						for( int i = 0; i < setpaksLen; i++ )
 						{
-							if( !IsStringNumeric( setpaks[i] ) )
+							if( !IsStringNumeric( setpaks[ i ] ) )
 							{
 								string error = format( "[SpawnSystem] \"%s\" in \"%s\" is not a numeric spawn set number. Check playlists config", setpaks[i], currentMapSpawnSets )
 								throw error
 							}
 							
-							setpaks[i] = "_set_" + setpaks[i]
+							setpaks[ i ] = "_set_" + setpaks[i]
 						}
 						success = true
 					}
@@ -645,19 +680,66 @@ array<SpawnData> function SpawnSystem_ReturnAllSpawnLocations( int eMap = -1, ta
 				
 				if( success )
 				{
-					string prefferred = "_set_" + string ( file.preferredSpawnPak )
-					if( options.prefer && setpaks.contains( prefferred ) )
+					string preferred = "_set_" + string ( file.preferredSpawnPak )
+					if( options.prefer && setpaks.contains( preferred ) )
 					{
-						int j = setpaks.find( prefferred )			
+						int j = setpaks.find( preferred )			
 						if( j == -1 )
 						{
-							Warning( "[SpawnSystem] Preferred spawnpak: " + prefferred + " not found!" )
+							Warning( "[SpawnSystem] Preferred spawnpak: " + preferred + " not found!" )
 							spawnSet = defaultpak
 						}
 						else
 						{
 							spawnSet = setpaks[j]
 						}	
+					}
+					else if( options.rotate_all )
+					{
+						bool bValidIndexFound
+						string lastSpawnSet = "_set_1"
+								
+						if( !Dev_CommandLineHasParm( GetSpawnSetByMapEnumKey() ) )
+						{
+							if( setpaks.len() )
+								spawnSet = setpaks[ 0 ]
+							else 
+								Warning( "[SpawnSystem] No valid sets configured in playlist to rotate. Using default set" )
+						}
+						else 
+						{
+							lastSpawnSet = Dev_CommandLineParmValue( GetSpawnSetByMapEnumKey() )
+
+							bool bValidLastSetFound
+							if( !setpaks.contains( lastSpawnSet ) )
+								sqwarning( "[SpawnSystem] spawnpaks: Invalid spawnpak index was persisted. Using default: _set_1" )
+							else 
+								bValidLastSetFound = true
+							
+							if( bValidLastSetFound )
+							{
+								int setPaksLen = setpaks.len()
+								if( setPaksLen < 2 )
+								{
+									Warning( "[SpawnSystem] options.rotate_all was set, but there is only one set to rotate." )
+								}
+								else 
+								{
+									for( int k = 0; k < setPaksLen - 1; k++ )
+									{
+										if( setpaks[ k ] == lastSpawnSet && k != ( setPaksLen - 1 ) )
+										{
+											spawnSet = setpaks[ k + 1 ] //set next in list to current load
+											break
+										}
+										else 
+											spawnSet = setpaks[ 0 ]
+									}				
+								}
+							}
+						}
+						
+						Dev_CommandLineAddParm( GetSpawnSetByMapEnumKey(), spawnSet )
 					}
 					else if( options.use_random )
 					{
@@ -818,13 +900,14 @@ array<SpawnData> function GenerateCustomSpawns( int eMap, int coreSpawnsLen = -1
 		//////////////////////////////////////////////////////////////////////////////////		
 	}//: Switch (eMap)
 	
-	#if DEVELOPER //for timing tests
-		printt("[SpawnSystem] --- CALLING CUSTOM SPAWN CALLBACKS --- ")
-	#endif
 	//add with AddCallback_SpawnsPostInit( functionref ) 
 	//  function ref should return a LocPairData data object
 	if( file.bRunCallbacks )
 	{
+		#if DEVELOPER //for timing tests
+			printt("[SpawnSystem] --- CALLING CUSTOM SPAWN CALLBACKS --- ")
+		#endif
+	
 		foreach( callbackFunc in file.onSpawnInitCallbacks )
 		{
 			LocPairData data = callbackFunc()
@@ -1296,7 +1379,8 @@ bool function ValidateOptions( table<string,bool> options )
 		"use_random" 			in options &&
 		"prefer"				in options &&
 		"use_custom_rpak"		in options &&
-		"use_custom_playlist" 	in options
+		"use_custom_playlist" 	in options &&
+		"rotate_all"			in options
 	)
 }
 
@@ -1540,6 +1624,11 @@ table< string, array< SpawnData > > function SpawnSystem_SortSpawnsByMetaData( a
 	#endif 
 	
 	return sorted
+}
+
+string function GetSpawnSetByMapEnumKey()
+{
+	return format( "ss_%d", MapName() )
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -2787,6 +2876,9 @@ void function DEV_LoadPak( string pak = "", string playlist = "", int preferred 
 	if( !__bCheckReload() )
 		return
 		
+	if( !settings.bOptionsAreSet )
+		SpawnSystem_InitGamemodeOptions()
+		
 	if( empty( DEV_SpawnType() ) )
 	{
 		Warning( "No spawn-maker type was set." )
@@ -2799,6 +2891,7 @@ void function DEV_LoadPak( string pak = "", string playlist = "", int preferred 
 	{
 		AutoSetupSettings()
 		file.currentSpawnPak = ""
+		pak = ""
 	}
 	
 	bool usePlaylist = false
@@ -2814,8 +2907,9 @@ void function DEV_LoadPak( string pak = "", string playlist = "", int preferred 
 			printm( msg )
 		}
 		
-		printt( "Custom Pak was empty, using current based on DEV_SpawnPlaylist()." )
-		printm( "Custom Pak was empty, using current based on DEV_SpawnPlaylist()." )
+		string basedOnText = !empty( playlist ) ? "playlist param" : "DEV_SpawnPlaylist()"
+		printt( "Custom Pak was empty, using current based on", basedOnText )
+		printm( "Custom Pak was empty, using current based on", basedOnText )
 	}
 	else 
 	{
@@ -2833,21 +2927,19 @@ void function DEV_LoadPak( string pak = "", string playlist = "", int preferred 
 		SpawnSystem_SetCustomPlaylist( DEV_SpawnsPlaylist() )
 		usePlaylist = true
 	}
-
-	if( !settings.bOptionsAreSet )
-		SpawnSystem_InitGamemodeOptions()
 		
 	table<string,bool> spawnOptions = {}
 	bool prefer = preferred > 1
 	
 	spawnOptions["use_sets"] <- prefer
-	spawnOptions["use_random"] <- false
 	spawnOptions["prefer"] <- prefer
 	if( prefer )
 		SpawnSystem_SetPreferredPak( preferred )
 		
 	spawnOptions["use_custom_rpak"] <- SpawnSystem_SetCustomPak( pak )
 	spawnOptions["use_custom_playlist"] <- usePlaylist
+	spawnOptions["use_random"] <- false
+	spawnOptions["rotate_all"] <- false
 	
 	array<SpawnData> devLocations = customDevSpawnsList().len() > 0 && !bUsePak ? SpawnSystem_CreateSpawnObjectArray( customDevSpawnsList() ) : SpawnSystem_ReturnAllSpawnLocations( SpawnSystem_FindBaseMapForPak( MapName() ), spawnOptions )
 	

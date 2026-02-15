@@ -19,7 +19,7 @@ Style configurator:
 2. From the menu nav located at top, select "Settings" -> "Style Configurator"
 3. Select theme: VS2019-Dark
 4. Make sure Foreground color is white and background color is black
-5. MAKE SURE the "Enable global background colour"  or "Force background color for all styles" box is checked
+5. MAKE SURE the "Enable global background colour"  or "Force background color for all styles" box is checked. For newer versions you only need to force background color, and not foreground.
 
 
 Importing the language:

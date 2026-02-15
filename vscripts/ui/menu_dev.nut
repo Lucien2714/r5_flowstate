@@ -81,44 +81,44 @@ bool function GetCheatsState()
 
 void function InitDevMenu( var newMenuArg )
 {
-		var menu = GetMenu( "DevMenu" )
+	var menu = GetMenu( "DevMenu" )
 
-		AddMenuEventHandler( menu, eUIEvent.MENU_OPEN, OnOpenDevMenu )
+	AddMenuEventHandler( menu, eUIEvent.MENU_OPEN, OnOpenDevMenu )
 
-		file.header = Hud_GetChild( menu, "MenuTitle" )
-		file.buttons = GetElementsByClassname( menu, "DevButtonClass" )
-		foreach ( button in file.buttons )
-		{
-			Hud_AddEventHandler( button, UIE_CLICK, OnDevButton_Activate )
-			Hud_AddEventHandler( button, UIE_GET_FOCUS, OnDevButton_GetFocus )
-			Hud_AddEventHandler( button, UIE_GET_FOCUS, OnDevButton_LoseFocus )
+	file.header = Hud_GetChild( menu, "MenuTitle" )
+	file.buttons = GetElementsByClassname( menu, "DevButtonClass" )
+	foreach ( button in file.buttons )
+	{
+		Hud_AddEventHandler( button, UIE_CLICK, OnDevButton_Activate )
+		Hud_AddEventHandler( button, UIE_GET_FOCUS, OnDevButton_GetFocus )
+		Hud_AddEventHandler( button, UIE_GET_FOCUS, OnDevButton_LoseFocus )
 
-			RuiSetString( Hud_GetRui( button ), "buttonText", "" )
-			Hud_SetEnabled( button, false )
-		}
+		RuiSetString( Hud_GetRui( button ), "buttonText", "" )
+		Hud_SetEnabled( button, false )
+	}
 
-		AddMenuFooterOption( menu, LEFT, BUTTON_B, true, "%[B_BUTTON|]% Back", "Back" )
-		AddMenuEventHandler( menu, eUIEvent.MENU_NAVIGATE_BACK, BackOnePage_Activate )
-		AddMenuFooterOption( menu, LEFT, BUTTON_Y, true, "%[Y_BUTTON|]% Repeat Last Dev Command:", "Repeat Last Dev Command:", RepeatLastCommand_Activate )
-		AddMenuFooterOption( menu, LEFT, BUTTON_BACK, true, "%[BACK|]% Bind Selection to Gamepad", "", BindCommandToGamepad_Activate )
-		file.footerHelpTxtLabel = GetElementsByClassname( menu, "FooterHelpTxt" )[0]
+	AddMenuFooterOption( menu, LEFT, BUTTON_B, true, "%[B_BUTTON|]% Back", "Back" )
+	AddMenuEventHandler( menu, eUIEvent.MENU_NAVIGATE_BACK, BackOnePage_Activate )
+	AddMenuFooterOption( menu, LEFT, BUTTON_Y, true, "%[Y_BUTTON|]% Repeat Last Dev Command:", "Repeat Last Dev Command:", RepeatLastCommand_Activate )
+	AddMenuFooterOption( menu, LEFT, BUTTON_BACK, true, "%[BACK|]% Bind Selection to Gamepad", "", BindCommandToGamepad_Activate )
+	file.footerHelpTxtLabel = GetElementsByClassname( menu, "FooterHelpTxt" )[0]
 
-		RegisterSignal( "DEV_InitCodeDevMenu" )
-		AddUICallback_LevelLoadingFinished( DEV_InitCodeDevMenu )
-		AddUICallback_LevelShutdown( ClearCodeDevMenu )
-		//OnOpenDevMenu()
+	RegisterSignal( "DEV_InitCodeDevMenu" )
+	AddUICallback_LevelLoadingFinished( DEV_InitCodeDevMenu )
+	AddUICallback_LevelShutdown( ClearCodeDevMenu )
+	//OnOpenDevMenu()
 }
 
 
 void function AddLevelDevCommand( string label, string command )
 {
-		string codeDevMenuAlias = DEV_MENU_NAME + "/" + label
-		DevMenu_Alias_DEV( codeDevMenuAlias, command )
+	string codeDevMenuAlias = DEV_MENU_NAME + "/" + label
+	DevMenu_Alias_DEV( codeDevMenuAlias, command )
 
-		DevCommand cmd
-		cmd.label = label
-		cmd.command = command
-		file.levelSpecificCommands.append( cmd )
+	DevCommand cmd
+	cmd.label = label
+	cmd.command = command
+	file.levelSpecificCommands.append( cmd )
 }
 
 void function OnOpenDevMenu()

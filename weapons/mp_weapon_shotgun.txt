@@ -99,7 +99,7 @@ WeaponData
 	"blast_pattern"									"eva8"
 	"primary_attack_ignores_spread"					"1"
 	"blast_pattern_zero_distance"        			"512.000000"
-	"blast_pattern_default_scale"        			"1.500000"
+	"blast_pattern_default_scale"        			"1.400000"
 	"blast_pattern_npc_scale"            			"1.000000"
 
 	// Damage - When Used by Players
@@ -168,7 +168,7 @@ WeaponData
 	"dof_nearDepthEnd"								"0.000000"
 
 	// Behavior
-	"fire_rate"   									"2.700000"
+	"fire_rate"   									"2.800000"
 	"reload_time" 									"2.750000"
 	"reload_time_late1"								"1.450000"
 	"reload_time_late2"								"0.250000"

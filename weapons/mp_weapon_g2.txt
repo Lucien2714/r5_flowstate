@@ -240,7 +240,7 @@
 	"dof_zoom_focusArea_bottom"                "-0.012000"
 
 	// FX
-	"fx_muzzle_flash_attach_scoped"            "muzzle_flash"
+	"fx_muzzle_flash_attach_scoped"            "muzzle_flash_scoped"
 	"fx_shell_eject_attach_scoped"             "shell"
 
 	"fx_shell_eject_view"						"wpn_shelleject_rifle_assault_FP"

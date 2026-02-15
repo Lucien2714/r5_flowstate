@@ -8,7 +8,7 @@ global function SetupSettingsSlider
 global function CreateSettingsConVarData
 global function SaveSettingsConVars
 global function AnySettingsConVarChanged
-
+global function AddCallback_UiSettingsUpdated
 
 global enum eConVarType
 {
@@ -40,6 +40,8 @@ struct
 	bool			   anyChanged
 
 	array<asset> panelDefaultImages
+	array<void functionref()> settingsUpdatedCallbacks
+	
 } file
 
 void function InitSettingsPanel( var panel )
@@ -141,12 +143,20 @@ void function OnSettingsPanel_Hide( var panel )
 		}
 
 		PIN_Settings( settingsTable )
+		
+		foreach( callbackFunc in file.settingsUpdatedCallbacks )
+			thread callbackFunc()
 
 		if ( IsFullyConnected() )
 			RunClientScript( "UIToClient_SettingsUpdated" )
 	}
 }
 
+void function AddCallback_UiSettingsUpdated( void functionref() callbackFunc )
+{
+	mAssert( !file.settingsUpdatedCallbacks.contains( callbackFunc ), "Tried to add callbackFunc %s with %s() but was already added", string( callbackFunc ), FUNC_NAME() )
+	file.settingsUpdatedCallbacks.append( callbackFunc )
+}
 
 table function SettingsConVarsToTable( array<ConVarData> conVarDataList )
 {

@@ -44,10 +44,10 @@
 	/////////////////////////////////
 	//Charging
 	//
-   "charge_time" 									"0.350000"
+   "charge_time" 									"0.400000"
    "charge_levels"									"2"
    "charge_level_base"								"1"
-   "charge_additional_damage_multiplier"			"0.500000"
+   "charge_additional_damage_multiplier"			"0.400000"
 
    "charge_cooldown_time"							"0.010000"
    "charge_cooldown_delay"   						"0.000000"
@@ -96,12 +96,12 @@
 
 	// Damage
 	//
-     "damage_near_value"   					"43"
-     "damage_far_value"						"43"
-     "damage_very_far_value"				"43"
-     "damage_near_value_titanarmor"			"43"
-     "damage_far_value_titanarmor" 			"43"
-     "damage_very_far_value_titanarmor" 	"43"
+     "damage_near_value"   					"41"
+     "damage_far_value"						"41"
+     "damage_very_far_value"				"41"
+     "damage_near_value_titanarmor"			"41"
+     "damage_far_value_titanarmor" 			"41"
+     "damage_very_far_value_titanarmor" 	"41"
      "damage_leg_scale"                     "0.850000"
 
 
@@ -170,7 +170,7 @@
 
 	// Viewkick Spring
 	//
-	"viewkick_pattern"                          "3030"
+	"viewkick_pattern"                          "3030_repeater"
     "viewkick_spring" 						    "3030_vkp"
     "viewkick_spring_hot"                       "3030_vkp_hot"
 

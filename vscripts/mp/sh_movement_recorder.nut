@@ -21,7 +21,6 @@ struct RecordingAnimation
 
 const int MAX_SLOT = 5
 const int MAX_NPC_BUDGET = 120 //dirty cap
-const int DUMMY_MAX_HEALTH = 100
 
 struct
 {
@@ -38,9 +37,12 @@ struct
 		
 		float helmet_lv4 = 0.65
 		float adminSetPlaybackRate = 1.0
+		float randomPlaybackDelay = 0.2
 		bool bDummyDeathNotifications = true
 		bool bAutoRefilAmmoOnHit
-		float randomPlaybackDelay = 0.2
+		bool bEnableHelmets
+		int dummyShieldLevel
+		int dummyHealthPoints
 		
 		table<int, array<entity> > _dummyMaps__Template = {
 			[ 0 ] = [ null ],
@@ -110,6 +112,9 @@ void function Sh_FS_MovementRecorder_Init()
 		file.bDummyDeathNotifications 	= GetCurrentPlaylistVarBool( "register_dummie_kill_as_actual_kill", false )
 		file.bAutoRefilAmmoOnHit		= GetCurrentPlaylistVarBool( "auto_refill_ammo_on_hit", false )
 		file.randomPlaybackDelay		= GetCurrentPlaylistVarFloat( "delay_between_random_playback", 0.2 )
+		file.dummyShieldLevel			= GetCurrentPlaylistVarInt( "dummy_shield_level", 2 )
+		file.dummyHealthPoints			= GetCurrentPlaylistVarInt( "dummy_health", 100 )
+		file.bEnableHelmets				= GetCurrentPlaylistVarBool( "enable_helmets", false )
 		
 		if( !FlowState_AdminTgive() )
 			INIT_WeaponsMenu()
@@ -251,10 +256,13 @@ void function FS_MovementRecorder_ResetAllBindings( entity player )
 void function FS_MovementRecorder_CreateInputHintsRUI( bool state )
 {
 	foreach( line in file.inputHintLines )
+	{
 		if( line != null )
 		{
 			RuiDestroyIfAlive( line )
+			line = null 
 		}
+	}
 
 	file.inputHintLines.clear()
 
@@ -262,7 +270,7 @@ void function FS_MovementRecorder_CreateInputHintsRUI( bool state )
 		return
 
 	UISize screenSize = GetScreenSize()
-	var topo = RuiTopology_CreatePlane( <( screenSize.width * 0.070),( screenSize.height * 0 ), 0>, <float( screenSize.width ), 0, 0>, <0, float( screenSize.height ), 0>, false )
+	var topo = RuiTopology_CreatePlane( <( screenSize.width * 0.070),( screenSize.height * 0 ), 0>, <float( screenSize.width - 30 ), 0, 0>, <0, float( screenSize.height ), 0>, false )
 	var hintRui = RuiCreate( $"ui/tutorial_hint_line.rpak", topo, RUI_DRAW_POSTEFFECTS, MINIMAP_Z_BASE + 10 )
 	RuiSetString( hintRui, "buttonText", "%F2%" )
 	RuiSetString( hintRui, "gamepadButtonText", "%F2%" )
@@ -381,7 +389,8 @@ void function FS_MovementRecorder_UpdateHints( int hint, bool state, float durat
 	{
 		RuiSetString( file.inputHintLines[0], "hintText", "Stop Recording" )
 		return
-	} else if( hint == 0 && !state )
+	} 
+	else if( hint == 0 && !state )
 	{
 		RuiSetString( file.inputHintLines[0], "hintText", "Start Recording" )
 		return
@@ -428,7 +437,8 @@ void function FS_MovementRecorder_UpdateHints( int hint, bool state, float durat
 		DisplayTime dt = SecondsToDHMS( duration.tointeger() )
 		RuiSetString( file.inputHintLines[hint], "hintText", "Slot " + slotname(hint) + " - Play " + format( "%.2d:%.2d", dt.minutes, dt.seconds ) )
 		return
-	} else if( !state )
+	}
+	else if( !state )
 	{
 		RuiSetString( file.inputHintLines[hint], "hintText", "Slot " + slotname(hint) + " - Empty" )
 		return
@@ -822,6 +832,9 @@ void function StopRecordingAnimation( entity player )
 
 		var anim = player.p.recordingAnims[ slot ]
 		float duration = GetRecordedAnimationDuration( anim )
+		
+		printt( "CALL FS_MovementRecorder_UpdateHints:", slot + 1, true, duration )
+		
 		Remote_CallFunction_NonReplay( player, "FS_MovementRecorder_UpdateHints", slot + 1, true, duration )
 	}
 }
@@ -1043,7 +1056,7 @@ void function PlayAnimInSlot( entity player, int slot, bool remove = false, bool
 		dummy.Hide()
 
 		DispatchSpawn( dummy )
-		SetDummyProperties( dummy, 2 )
+		SetDummyProperties( dummy, file.dummyShieldLevel )
 		
 		WaitFrame()
 		
@@ -1155,9 +1168,9 @@ void function AssignCharacter( entity player, int index )
 	player.SetPlayerSettingsWithMods( characterSetFile, [] )
 }
 
-int function ReturnShieldAmountForDesiredLevel( int shield )
+int function ReturnShieldAmountForDesiredLevel( int shield ) //(mk): if this is updated, update playlist var dummy_shield_level
 {
-	switch(shield)
+	switch( shield )
 	{
 		case 0:
 			return 0
@@ -1181,8 +1194,8 @@ void function SetDummyProperties( entity dummy, int shield )
 	dummy.SetTitle( r5rDevs.getrandom() )
 	dummy.SetShieldHealthMax( ReturnShieldAmountForDesiredLevel( shield ) )
 	dummy.SetShieldHealth( ReturnShieldAmountForDesiredLevel( shield ) )
-	dummy.SetMaxHealth( DUMMY_MAX_HEALTH )
-	dummy.SetHealth( DUMMY_MAX_HEALTH )
+	dummy.SetMaxHealth( file.dummyHealthPoints )
+	dummy.SetHealth( file.dummyHealthPoints )
 	dummy.SetDamageNotifications( true )
 	dummy.SetTakeDamageType( DAMAGE_YES )
 	dummy.SetCanBeMeleed( true )
@@ -1202,11 +1215,12 @@ void function RecordingAnimationDummy_OnDamaged( entity dummy, var damageInfo )
 	if( !attacker.IsPlayer() ) 
 		return
 
-	float damage = DamageInfo_GetDamage( damageInfo )
+	float basedamage = DamageInfo_GetDamage( damageInfo )
+	float headshotMultiplier = GetHeadshotDamageMultiplierFromDamageInfo( damageInfo )
 	
 	//fake helmet
-	float headshotMultiplier = GetHeadshotDamageMultiplierFromDamageInfo(damageInfo)
-	float basedamage = DamageInfo_GetDamage( damageInfo )/headshotMultiplier
+	if( file.bEnableHelmets )
+		basedamage = basedamage / headshotMultiplier
 	
 	if( IsValidHeadShot( damageInfo, dummy ) )
 	{

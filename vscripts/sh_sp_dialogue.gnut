@@ -642,8 +642,13 @@ void function PlayDialogueForAnimEvent( entity ent, string dialogueName )
 
 void function PlayDialogue( string name, entity speaker, float delay = 0, int dialogueFlags = 0 )
 {
+	if ( !IsBattleChatterEnabled() )
+		return
+		
 	array<entity> players = GetPlayerArray_Alive()
-	for ( int i = players.len() - 1; i >= 0; i-- )
+	int playersLen = players.len() - 1
+	
+	for ( int i = playersLen; i >= 0; i-- )
 	{
 		if ( i > 0 )
 			thread PlayDialogueForPlayer( name, players[i], speaker, delay, dialogueFlags )
@@ -654,8 +659,13 @@ void function PlayDialogue( string name, entity speaker, float delay = 0, int di
 
 void function PlayDialogue_AllConnectedPlayers( string name, entity speaker, float delay = 0, int dialogueFlags = 0 )
 {
+	if ( !IsBattleChatterEnabled() )
+		return
+		
 	array<entity> players = GetPlayerArray()
-	for ( int i = players.len() - 1; i >= 0; i-- )
+	int playersLen = players.len() - 1
+	
+	for ( int i = playersLen; i >= 0; i-- )
 	{
 		if ( i > 0 )
 			thread PlayDialogueForPlayer( name, players[i], speaker, delay, dialogueFlags )
@@ -666,8 +676,13 @@ void function PlayDialogue_AllConnectedPlayers( string name, entity speaker, flo
 
 void function PlayDialogue_NoWait( string name, entity speaker )
 {
+	if ( !IsBattleChatterEnabled() )
+		return
+		
 	array<entity> players = GetPlayerArray_Alive()
-	for ( int i = players.len() - 1; i >= 0; i-- )
+	int playersLen = players.len() - 1
+	
+	for ( int i = playersLen; i >= 0; i-- )
 		PlayDialogueForPlayer_NoWait( name, players[i], speaker )
 }
 
@@ -997,6 +1012,9 @@ void function PlayDialogueForPlayer( string name, entity player, entity speaker,
 
 bool function ClientCommand_DialogueFinishedForID( entity player, array<string> args )
 {
+	if( !args.len() )//(mk): exploit patch.
+		return false
+
 	string aliasID = args[ 0 ]
 	table signalData = { aliasID = aliasID }
 	if ( int( aliasID ) in file.waitingOnDialogue )

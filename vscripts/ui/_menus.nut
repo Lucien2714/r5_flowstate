@@ -660,11 +660,6 @@ void function UICodeCallback_LevelShutdown()
 	UiNewnessQueries_LevelShutdown()
 
 	TEMP_CircularReferenceCleanup()
-	
-	#if TRACKER && HAS_TRACKER_DLL
-	//TODO: state !ready waitframe 
-	//while( SQ_GetLogstate() )
-	#endif
 }
 
 
@@ -1791,6 +1786,7 @@ void function InitMenus()
 	AddMenu( "ConnectingDialog", $"scripts/resource/ui/menus/dialog_connecting.menu", InitConnectingDialog )
 	AddMenu( "DataCenterDialog", $"scripts/resource/ui/menus/dialog_datacenter.menu", InitDataCenterDialogMenu )
 	AddMenu( "EULADialog", $"scripts/resource/ui/menus/dialog_eula.menu", InitEULADialog )
+	AddMenu( "DevWarningDialog", $"scripts/resource/ui/menus/dialog_dev_warning.menu", InitDevWarningDialog )
 	AddMenu( "ModeSelectDialog", $"scripts/resource/ui/menus/dialog_mode_select.menu", InitModeSelectDialog )
 	AddMenu( "GamemodeSelectV2Dialog", $"scripts/resource/ui/menus/dialog_gamemode_select_v2.menu", InitGamemodeSelectV2Dialog )
 	AddMenu( "ErrorDialog", $"scripts/resource/ui/menus/dialogs/ok_dialog.menu", InitErrorDialog )

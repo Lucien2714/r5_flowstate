@@ -61,6 +61,8 @@ global function TrackerGetSettingInt
 global function TrackerGetSettingFloat
 global function SendServerMessageToPlayer
 global function SendServerMessage
+global function Tracker_RegisterTrackingAsNonCombatMode
+global function Tracker_AddDestroyStatCallback
 
 global function SetAfkToRest
 global function ClientCommand_RequestStat
@@ -250,7 +252,7 @@ global struct GameSummarySquadData
 	int deaths
 }
 
-global struct DamageEvent 
+global struct DamageEvent
 {
     int weaponSource
 	array<int> weaponOrder
@@ -351,12 +353,6 @@ table< int, DamageEvent > allDamageEventsMap = {}
 array< PlayerMetrics > PlayerMetricsArray
 array< PlayerVerifyCount > playerVerifyCounts
 
-#if SERVER
-	bool function Enable_CC_Administration() 		{ return GetCurrentPlaylistVarBool( "cc_administration", false ) }
-	bool function Logging_ShipStats() 				{ return TrackerGetSettingBool( "server.TRACKER_SHIPSTATS" ) }
-	bool function Ea_Verify_Server()				{ return TrackerGetSettingBool( "server.EA_VERIFY_SERVER" ) && GetConVarInt( "sv_onlineAuthEnable" ) == 1 }
-#endif
-
 struct PlayerData 
 {
 	string playerUID 
@@ -383,11 +379,12 @@ struct //Todo: move appropriate to tracker.var
 	table <string,int> Global_R5RDEV_IntSettings
 	table <string,bool> Global_R5RDEV_BoolSettings
 	
-	table<string, array<void functionref( entity player, string data )> > PlayerSettingsMap = {}
-	table<string, table<string,string> > PlayerData = {}// playerUID = setting,value
-	array<void functionref( entity player ) > syncDataFullyLoadedCallbacks = []
-	table<string, array< void functionref(entity player) > > registeredStatCallbackFuncs = {}
-	array<void functionref() > batchStatsLoadedCallbacks = []
+	table<string, array<void functionref( entity player, string data )> > PlayerSettingsMap
+	table<string, table<string,string> > PlayerData// playerUID = setting,value
+	array<void functionref( entity player ) > syncDataFullyLoadedCallbacks
+	table<string, array< void functionref(entity player) > > registeredStatCallbackFuncs
+	array<void functionref() > batchStatsLoadedCallbacks
+	array<void functionref() > destroyStatCallbacks
 	array<string> statsLocalAllowed
 	
 	array<string> requestedStatsArray
@@ -415,6 +412,7 @@ struct //Todo: move appropriate to tracker.var
 	bool bStatsShipped
 	bool stats_discord_webhook_matches_enabled
 	bool bClientCommandAdminEnabled
+	bool bLiveMetricsOnlyForNonCombatMode
 	
 	bool sg_counter_msg
 	float FS_MaxHealth
@@ -644,6 +642,16 @@ void function CodeCallback_PlayerStatsReady( string uid )
 	#if DEVELOPER
 		printt( "CodeCallback_PlayerStatsReady:", player )
 	#endif
+}
+
+bool function Logging_ShipStats()
+{ 
+	return TrackerGetSettingBool( "server.TRACKER_SHIPSTATS" ) 
+}
+
+void function Tracker_RegisterTrackingAsNonCombatMode( bool setting )
+{
+	file.bLiveMetricsOnlyForNonCombatMode = setting
 }
 
 array<PlayerMetrics> function Tracker_GetPlayerMetricsArray()
@@ -1210,6 +1218,12 @@ void function Tracker_RegisterStat( string statname, void functionref( entity ) 
 		file.statsLocalAllowed.append( statname )
 }
 
+void function Tracker_AddDestroyStatCallback( void functionref() callbackFunc )
+{
+	mAssert( !file.destroyStatCallbacks.contains( callbackFunc ), "Tried to add callback %s with %s but was already added", string( callbackFunc ), FUNC_NAME() )
+	file.destroyStatCallbacks.append( callbackFunc )	
+}
+
 array<string> function BuildRequestedStatsArray()
 {
 	array<string> statKeysArray
@@ -1467,6 +1481,9 @@ void function __DestroyStats()
 		int mID = InitializePlayerMetricsStructForPlayer( player )
 		__GetPlayerMetrics( mID ).ent = player
 	}
+	
+	foreach( callbackFunc in file.destroyStatCallbacks )
+		callbackFunc()
 }
 
 void function __CONTROLLED_LogInit()
@@ -1535,10 +1552,8 @@ void function PIN_Init()
 		AddCallback_GameStateEnter( eGameState.Playing, __executeEventStart_messages )
 	}
 	
-	#if TRACKER 
-		FlagInit( "DeterminePreviousChampion", false )
-		FlagInit( "PreviousChampionDetermined", false )
-	#endif
+	FlagInit( "DeterminePreviousChampion", false )
+	FlagInit( "PreviousChampionDetermined", false )
 	
 	if( file.bTrackerEnabled )
 	{
@@ -1577,7 +1592,7 @@ void function PIN_Init()
 		file.FS_MaxHealth = ( GetCurrentPlaylistVarFloat( "default_shield_hp", 0 ) ) + 100 //TODO: Use health/shield getters
 	}
 	
-	if ( Ea_Verify_Server() ) //You should not attempt to enable this, the backend will verify..
+	if ( TrackerGetSettingBool( "server.EA_VERIFY_SERVER" ) && GetConVarInt( "sv_onlineAuthEnable" ) == 1 ) //You should not attempt to enable this, the backend will verify..
 		AddClientCommandCallback( "ea_verify", ClientCommand_mkos_ea_verify )
 	
 	//initialize array/table maps
@@ -1588,7 +1603,7 @@ void function PIN_Init()
 	if ( file.restricted_server ) 
 		PlayerWhitelistInit()
 	
-	//init superglide strings // TODO: move to localization playlist tokens
+	//init superglide strings
 	file.sg_counter_msg = GetCurrentPlaylistVarBool( "superglide_counter_msg", false )
 	file.superglide_msg = GetCurrentPlaylistVarString( "custom_superglide_msg", "" )
 	file.superglidetitle = file.global_stats ? "Season Glides" : "Glides";
@@ -3179,7 +3194,7 @@ void function Tracker_HandleDamage( DamageEvent event, entity attacker, int weap
 {
 	if ( !IsValid( victim ) || !IsValid( attacker ) )
 		return
-	
+		
 	float currentHealth = float( victim.GetHealth() + victim.GetShieldHealth() )
 	
 	// negate damage that can't be done (no health to recieve damage)
@@ -3335,8 +3350,14 @@ void function Tracker_OnPlayerDamaged( entity victim, var damageInfo )
 	// early exits
     if ( !IsValid( victim ) || Bleedout_IsBleedingOut( victim ) ) 
 		return
+		
+	if( victim.e.stateFlags & STATE_FLAG_NO_STATS )
+		return
 
     entity attacker = DamageInfo_GetAttacker( damageInfo )
+	if( attacker.e.stateFlags & STATE_FLAG_NO_STATS )
+		return
+	
     int weaponSource = DamageInfo_GetDamageSourceIdentifier( damageInfo )
     
 	// exclude this damage type
@@ -4702,12 +4723,6 @@ void function __UpdateLiveStats_internal( SerializedData metrics )
 		TrackerUpdateLiveStats__internal( metrics )
 }
 
-//Modes where winning doesn't requiring fighting. 
-const array<int> IGNORE_FIRST_BLOOD_PLAYLISTS =
-[
-	ePlaylists.fs_haloMod_ctf
-]
-
 void function FinishGameStatsRound()
 {
 	if( process_end_round_complete == true )
@@ -4735,12 +4750,18 @@ void function FinishGameStatsRound()
 			if( !Logging_ShipStats() )
 				sqprint( "Shipping to stats server DISABLED -- check playlists file to enable --" )
 				
-			if( ( !IGNORE_FIRST_BLOOD_PLAYLISTS.contains( Playlist() ) && !Flag( "SurvivalCommentary_FirstBloodReached" ) ) || !file.bShouldShip )
+			if( !Flag( "SurvivalCommentary_FirstBloodReached" ) && !file.bShouldShip && !file.bLiveMetricsOnlyForNonCombatMode )
 			{
 				sqprint( "No stats to ship...\n" )
 				TrackerStopLogging__internal( false )
 				
 				if( file.bForceUpdatePlayerData )
+					__UpdateMetricsNow()
+			}
+			else if( file.bLiveMetricsOnlyForNonCombatMode )
+			{
+				TrackerStopLogging__internal( false )
+				if( Logging_ShipStats() )
 					__UpdateMetricsNow()
 			}
 			else
@@ -4749,7 +4770,8 @@ void function FinishGameStatsRound()
 				TrackerStopLogging__internal( ship ) //IMPORTANT
 				
 				//update live global stats for match making (verified only)
-				__UpdateMetricsNow()
+				if( ship )//test
+					__UpdateMetricsNow()
 				
 				//send to discord:		
 				if( DiscordHook_MatchesRecapEnabled() )
@@ -4914,12 +4936,26 @@ void function PIN_PlayerRevived( entity injured, entity healer )
 void function PIN_PlayerKilled( entity victim, entity attacker, var damageInfo )
 {	
 	if ( file.bTrackerEnabled && TrackerIsLogging__internal() && IsValid( victim ) && victim.IsPlayer() )
+	{
+		if( attacker.e.stateFlags & STATE_FLAG_NO_STATS )
+			return
+			
+		if( victim.e.stateFlags & STATE_FLAG_NO_STATS )
+			return
+			
 		thread __EndFight( victim, attacker, damageInfo, Time(), StatPrintVector( attacker.GetOrigin() ), StatPrintVector( victim.GetOrigin() ) )
+	}
 }
 
 void function Tracker_EndFight( entity victim, entity attacker, var damageInfo )
 {
 	if( !Flowstate_IsTrackerSupportedMode() || !file.bTrackerEnabled || !TrackerIsLogging__internal() )
+		return
+		
+	if( attacker.e.stateFlags & STATE_FLAG_NO_STATS )
+		return
+		
+	if( victim.e.stateFlags & STATE_FLAG_NO_STATS )
 		return
 		
 	thread __EndFight( victim, attacker, damageInfo, Time(), StatPrintVector( attacker.GetOrigin() ), StatPrintVector( victim.GetOrigin() ) )
@@ -5448,6 +5484,7 @@ bool function bEnc(){ return file.bTrackerEncryption }
 bool function bGlobalStats(){ return file.global_stats }
 bool function bBotEnabled(){ return file.bChatbotEnabled }
 void function Tracker_SetStartLog(){}
+void function Tracker_RegisterTrackingAsNonCombatMode(){}
 
 //persistence
 string function Tracker_FetchPlayerData( string UID, string setting ){ return "" }
@@ -5466,6 +5503,7 @@ bool function Tracker_IsRestrictedServer(){ return false }
 void function Tracker_SetRestrictedServer( bool _ ){}
 SerializedData function Tracker_BuildAllPlayerMetrics( bool _ ){ return "" }
 int function Tracker_GetStartUnixTime(){ return file.launchStartUnixTime }
+void function Tracker_AddDestroyStatCallback( void functionref() callbackFunc ){}
 
 void function PIN_Init()
 {

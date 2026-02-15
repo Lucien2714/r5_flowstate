@@ -1778,7 +1778,7 @@ bool function CommsMenu_CanUseMenu( entity player )
 	if( StatusEffect_GetSeverity( player, eStatusEffect.camera_view) > 0 )
 		return false
 	
-	if( G_REGISTER_1V1_NETVARS_FOR_PLAYLIST.contains( Playlist() ) )
+	if( g_bIs1v1GameType() )
 	{
 		if( player.GetPlayerNetInt( "FS_1v1_PlayerState" ) == e1v1State.WAITING || player.GetPlayerNetInt( "FS_1v1_PlayerState" ) == e1v1State.RESTING )
 			return false

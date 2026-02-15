@@ -102,6 +102,9 @@ void function SetUIVar( table<string,var> obj, string varName, value )
 
 function ServerCallback_SetUIVar( varHandle, value )
 {
+	if( !( varHandle in _uiVarHandles ) )
+		return
+		
 	local varName = _uiVarHandles[varHandle]
 
 	_uiVars[varName] = value

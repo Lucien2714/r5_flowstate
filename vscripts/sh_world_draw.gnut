@@ -9,6 +9,7 @@ global function WorldDrawAsset_RegisterRemoteAsset
 	global function WorldDrawAsset_GetAssetType
 	global function WorldDrawAsset_GetAssetRefById
 	global function WorldDrawAsset_PrintAssetsTable
+	global function WorldDrawAsset_IsAssetRefValid
 #endif
 
 #if SERVER
@@ -57,7 +58,7 @@ global enum eAssetType
 {
 	INVALID = -1,
 	IMAGE,
-	VIDEO
+	BIK
 } 
 
 struct
@@ -109,6 +110,15 @@ void function WorldDrawAsset_Init()
 	int iter = 0
 	foreach( asset varAsset, int assetType in registeredRemoteAssets )
 	{
+		#if DEVELOPER && DEBUG_WORLD_DRAW
+			printf
+			(
+				"AssetID[%d] = \"%s\"",
+				iter,
+				string( varAsset )
+			)
+		#endif
+	
 		assetRefToIdMap[ string( varAsset ) ] 	<- iter
 		assetIdToRefMap[ iter ]					<- string( varAsset )
 		assetIdToAssetMap[ iter ] 				<- varAsset
@@ -162,6 +172,12 @@ int function WorldDrawAsset_GetAssetType( asset varAsset, string assetRef = "" )
 	return eAssetType.INVALID
 }
 
+bool function WorldDrawAsset_IsAssetRefValid( string assetRef )
+{
+	asset potentialAsset = WorldDrawAsset_GetAssetByRef( assetRef )
+	return WorldDrawAsset_IsAssetValid( potentialAsset )
+}
+
 bool function WorldDrawAsset_IsAssetValid( asset varAsset )
 {
 	if( !IsValid( varAsset ) )
@@ -213,7 +229,7 @@ int function WorldDrawAsset_AssetRefToID( string ref )
 		return assetRefToIdMap[ ref ]
 	
 	#if DEBUG_WORLD_DRAW
-		mAssert( false, "Asset ref " + ref + " doesn't exist" )
+		mAssert( 0, "Asset ref %s doesn't exist", !empty( ref ) ? ref : "wasn't properly registered and" )
 	#endif
 	
 	return -1
@@ -228,7 +244,7 @@ int function WorldDrawAsset_AssetRefToID( string ref )
 
 	int function __GenerateUniqueWorldRuiID()
 	{
-		return ++file.uniqueWorldRuiID;
+		return ++file.uniqueWorldRuiID
 	}
 
 	int function WorldDrawAsset_CreateOnClient( entity player, string varAssetRef, vector origin, vector angles, float width, float height, int groupId, int remoteAssetRefID = -1, float alpha = -1.0, bool visible = true, float duration = -1.0 )
@@ -305,7 +321,7 @@ int function WorldDrawAsset_AssetRefToID( string ref )
 			
 		string signal = format( "VideoFinishedPlaying_%s", args[ 0 ] )
 		
-		if( BannerAssets_DoesSignalExist( signal ) )
+		if( WorldAssets_DoesSignalExist( signal ) )
 			player.Signal( signal )
 
 		return true
@@ -365,7 +381,7 @@ int function WorldDrawAsset_AssetRefToID( string ref )
 				RuiSetVisible( rui, visible )
 				break 
 				
-			case eAssetType.VIDEO:
+			case eAssetType.BIK:
 				rui = RuiCreate( $"ui/finisher_video.rpak", topoInfo.topo, RUI_DRAW_WORLD, 32767 )
 				
 				if( !IsValid( rui ) )
@@ -416,6 +432,7 @@ int function WorldDrawAsset_AssetRefToID( string ref )
 			RuiDestroyIfAlive( rui )
 
 		file.worldRUI[ RUIID ].clear()
+		delete file.worldRUI[ RUIID ]
 		
 		if( !( RUIID in file.worldRUITopo ) )
 			return
@@ -435,6 +452,7 @@ int function WorldDrawAsset_AssetRefToID( string ref )
 		}
 		
 		file.worldRUITopo[ RUIID ].clear()
+		delete file.worldRUITopo[ RUIID ]
 	}
 	
 	void function __DestroyWorldRUIWithID_Timed( var topo, var rui, float duration = 5 )
@@ -596,7 +614,7 @@ int function WorldDrawAsset_AssetRefToID( string ref )
 					RuiSetImage( rui, "basicImage", newAsset )
 					break 
 				
-				case eAssetType.VIDEO:
+				case eAssetType.BIK:
 					
 					if( !IsValid( rui ) )
 					{
@@ -773,7 +791,7 @@ int function WorldDrawAsset_AssetRefToID( string ref )
 			printw( "rui ID:", RUIID, "rui instance:", string( rui ), "type:", WorldDrawAsset_GetAssetTypeByID( bannerId ), "groupId:", groupId )
 		#endif
 		
-		if( WorldDrawAsset_GetAssetTypeByID( bannerId ) == eAssetType.VIDEO )
+		if( WorldDrawAsset_GetAssetTypeByID( bannerId ) == eAssetType.BIK )
 		{
 			if( visible )
 			{
@@ -897,7 +915,7 @@ int function WorldDrawAsset_AssetRefToID( string ref )
 	{
 		#if DEVELOPER && DEBUG_WORLD_DRAW
 			Warning( "Requested asset for ref id: " + ref )
-		#endif 
+		#endif
 		
 		if( ref in assetIdToAssetMap )
 		{

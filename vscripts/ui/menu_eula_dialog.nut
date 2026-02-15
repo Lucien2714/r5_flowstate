@@ -58,7 +58,7 @@ void function FetchEULA()
 		return
 		
 	file.bIsEulaFetching = true	
-	RequestEULAContents() //this must be fired or file.bEulaFetched will remain false forever, causing "continue" to not appear for players.
+	RequestEULAContents() //(mk): this must be fired or file.bEulaFetched will remain false forever, causing "continue" to not appear for players.
 }
 
 
@@ -147,7 +147,7 @@ void function SetEulaText_Thread()
 	( 
 		void function()
 		{
-			if( !file.bHasSeenEula ) //(mk): only set if needed.
+			if( !file.bHasSeenEula )
 				file.bHasSeenEula = true
 		}
 	)
@@ -167,7 +167,7 @@ void function SetEulaText_Thread()
 		acknowledgementText = "#EULA_ACKNOWLEDGEMENT" //IsEUVersion() ? "#EULA_ACKNOWLEDGEMENT_EU" : "#EULA_ACKNOWLEDGEMENT"
 	RuiSetArg( file.acknowledgement, "acknowledgementText", Localize( acknowledgementText ) )
 	
-	RegisterButtonPressedCallback( KEY_ENTER, AcceptEULA ) //(mk): likewise, don't register the callback to prevent rare case as well. This callback is a fallback to rare issue where mouse cannot click accept.
+	RegisterButtonPressedCallback( KEY_ENTER, AcceptEULA ) //(mk): likewise, don't register the callback until file.bEulaFetched is true to prevent rare case as well. This callback is a fallback to rare issue where mouse cannot click accept.
 	RegisterButtonPressedCallback( BUTTON_START, AcceptEULA ) //(mk): controller fallback
 }
 

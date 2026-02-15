@@ -116,18 +116,33 @@ global function AddCallback_OnPlayerUsedOffhandWeapon
 global function AddPlayerCallback_OnSpawned
 global function RemovePlayerCallback_OnSpawned
 
+global function AddEntityCallback_OnMeleed
+global function RemoveEntityCallback_OnMeleed
+
 const bool PRINT_MOVEMENT = false
 #document("CodeCallback_OnClientConnectionCompleted", "Called when player finishes connecting to the server")
 
+void function AddEntityCallback_OnMeleed( entity ent, void functionref( entity, entity, var ) callbackFunc )
+{
+	mAssert( !ent.e.onEntMeleedCallbacks.contains( callbackFunc ), "Tried to add callback func %s with %s but it was already added", string( callbackFunc ), FUNC_NAME() )
+	ent.e.onEntMeleedCallbacks.append( callbackFunc )
+}
+
+void function RemoveEntityCallback_OnMeleed( entity ent, void functionref( entity, entity, var ) callbackFunc )
+{
+	if( ent.e.onEntMeleedCallbacks.contains( callbackFunc ) )
+		ent.e.onEntMeleedCallbacks.removebyvalue( callbackFunc )
+}
+
 void function AddEntityCallback_OnPlayerRespawned( entity player, void functionref( entity ) callbackFunc )
 {
-	mAssert( !player.p.playerSpawnedCallbacks.contains( callbackFunc ) )
+	mAssert( !player.p.playerSpawnedCallbacks.contains( callbackFunc ), "Tried to add callback func %s with %s but it was already added", string( callbackFunc ), FUNC_NAME() )
 	player.p.playerSpawnedCallbacks.append( callbackFunc )
 }
 
 void function RemoveEntityCallback_OnPlayerRespawned( entity player, void functionref( entity ) callbackFunc )
 {
-	mAssert( player.p.playerSpawnedCallbacks.contains( callbackFunc ) )
+	mAssert( player.p.playerSpawnedCallbacks.contains( callbackFunc ), "Tried to add callback func %s with %s but it was already added", string( callbackFunc ), FUNC_NAME() )
 	player.p.playerSpawnedCallbacks.removebyvalue( callbackFunc )
 }
 
