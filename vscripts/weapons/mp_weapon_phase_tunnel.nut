@@ -28,6 +28,7 @@ global function PhaseTunnel_WaitForPhaseTunnelExpiration
 global function PhaseTunnel_PhaseEntity
 global function PhaseTunnel_SanitizeWeaponMods
 
+global function AddCallback_OnPlayerPlacedPortalEnd
 #if DEVELOPER
 global function DEV_PhaseTunnel_DestroyAll
 #endif
@@ -156,19 +157,19 @@ global struct PhaseTunnelPortalData
 }
 
 #if SERVER
+global enum ePortalDirection
+{
+	NONE = -1,
+	ENDTOSTART,
+	STARTTOEND
+}
+
 enum eTunnelExpirationType
 {
 	LIFE_TIME_END = 0,
 	INVALID_START_POS,
 	INVALID_END_POS,
 	INVALID_TUNNEL
-}
-
-enum eDirection
-{
-	NONE = -1,
-	ENDTOSTART,
-	STARTTOEND
 }
 #endif
 
@@ -209,6 +210,7 @@ struct
 		array<entity>                           allTunnelEnts
 		table<entity, bool>                     playerToHolsterState
 		table< entity, bool > 					hasLockedWeaponsAndMelee
+		array< void functionref( entity, PhaseTunnelData, float ) > onPlayerPortalPlacedCallbacks
 	#endif //SERVER
 
 } file
@@ -263,6 +265,12 @@ void function MpWeaponPhaseTunnel_Init()
 void function OnPlayerPositionReset( entity player )
 {
 	player.Signal( "PhaseTunnel_CancelPhaseTunnelUse" )
+}
+
+void function AddCallback_OnPlayerPlacedPortalEnd( void functionref( entity, PhaseTunnelData, float ) callbackFunc )
+{
+	mAssert( !file.onPlayerPortalPlacedCallbacks.contains( callbackFunc ), "Tried to add callback %s with %s but it was alreadt added.", string( callbackFunc ), FUNC_NAME() )
+	file.onPlayerPortalPlacedCallbacks.append( callbackFunc )
 }
 #endif
 
@@ -830,37 +838,6 @@ void function DEV_PhaseTunnel_DestroyAll()
 }
 #endif
 
-const float STANDARD_PORTAL_DESTROY_DELAY = 3.0
-void function RemovePortalDelayed( entity player, PhaseTunnelData tunnelData )
-{
-	wait STANDARD_PORTAL_DESTROY_DELAY
-	
-	if( IsValid( tunnelData.tunnelEnt ) )
-	{
-		tunnelData.tunnelEnt.Signal( "PhaseTunnel_DestroyTunnel" )
-		
-		if( IsValid( player ) )
-			LocalMsg( player, "#FS_REMOVED_PORTAL", "#FS_REMOVED_PORTAL_DESC", eMsgUI.IBMM, 10 )
-	}
-}
-
-const vector MYSTIC_MAGICAL_ELEVATOR_SHAFT_ORIGIN = < 9761, 5392.29, -4295.97 >
-const float MAX_ELEVATOR_SUCKING_BEHAVIOR_RADIUS = 150
-bool function Realistic_InAllowedZone( vector origin )
-{
-	//printw( "checking allowed zone:", VectorToString( origin ) )
-	float dist2d = Distance2D( origin, MYSTIC_MAGICAL_ELEVATOR_SHAFT_ORIGIN )
-	
-	if ( PHASE_TUNNEL_DEBUG_DRAW_PROJECTILE_TELEPORT )
-		DebugDrawCircle( MYSTIC_MAGICAL_ELEVATOR_SHAFT_ORIGIN, <0,0,0>, MAX_ELEVATOR_SUCKING_BEHAVIOR_RADIUS, 255, 0, 0, true, 10.0, 32 )
-	
-	if( dist2d > MAX_ELEVATOR_SUCKING_BEHAVIOR_RADIUS )
-		return true
-
-	return false
-}
-
-const float MAX_KIDNAP_TIME_AFTER_END_PORTAL = 1.85
 void function PhaseTunnel_WaitForPhaseTunnelExpiration( entity player, PhaseTunnelData tunnelData, float lifetime, bool DEBUG_DRAW = false )
 {
 	tunnelData.expirationType = eTunnelExpirationType.LIFE_TIME_END
@@ -875,15 +852,8 @@ void function PhaseTunnel_WaitForPhaseTunnelExpiration( entity player, PhaseTunn
 		player.EndSignal( "CleanUpPlayerAbilities" )
 		player.EndSignal( "PhaseTunnel_DestroyPlacement" )
 
-		if( Flowstate_IsRealisticMode() )
-		{
-			if( !Realistic_InAllowedZone( endPos ) )
-				thread RemovePortalDelayed( player, tunnelData )
-				
-			player.p.portalPlacements++
-			player.p.portalPlaceTime = Time()
-			thread CheckForKidnaps( tunnelData, MAX_KIDNAP_TIME_AFTER_END_PORTAL )
-		}
+		foreach( callbackFunc in file.onPlayerPortalPlacedCallbacks )
+			callbackFunc( player, tunnelData, lifetime )
 			
 		EndThreadOn_PlayerChangedClass( player )
 	}
@@ -959,55 +929,6 @@ void function PhaseTunnel_WaitForPhaseTunnelExpiration( entity player, PhaseTunn
 				PutPlayerInSafeSpot( user, null, null, closestAirDrop, closestAirDrop )
 			}
 		}
-	}
-}
-
-void function CheckForKidnaps( PhaseTunnelData tunnelData, float checkForTime )
-{
-	float startTime = Time()
-	entity tunnelOwner = IsValid( tunnelData.owner ) ? tunnelData.owner : GetEnt( "worldspawn" )
-	
-	EndSignal( tunnelOwner, "OnDestroy" )
-	
-	array<entity> kidnapees
-	
-	while( Time() < startTime + checkForTime )
-	{
-		WaitFrame()
-		
-		if( tunnelData.entUsers.len() == 0 )
-			continue
-			
-		foreach( entity user in tunnelData.entUsers )
-		{
-			WaitFrame() 
-			
-			if( tunnelOwner == user )
-				continue 
-				
-			//printw( "Checking enter direction", user.e.portalDirection )
-			if( user.e.portalDirection == eDirection.ENDTOSTART && !kidnapees.contains( user ) )
-			{
-				kidnapees.append( user )
-				__HandleKidnap( tunnelOwner, user )	
-			}
-		}
-	}		
-}
-
-void function __HandleKidnap( entity kidnapper, entity victim )
-{
-	//printw( "Message kidnapper: ", kidnapper )
-	
-	if( !IsValid( kidnapper ) )
-		return
-	
-	if( kidnapper.IsPlayer() )
-	{
-		kidnapper.p.portalKidnaps++	
-	
-		string victimName = IsValid( victim ) ? victim.p.name : "unknown"	
-		LocalEventMsg( kidnapper, "#FS_KIDNAPPED", victimName + " in " + ( Time() - kidnapper.p.portalPlaceTime ) + " seconds" )
 	}
 }
 
@@ -1156,7 +1077,7 @@ void function OnPhaseTunnelTriggerEnter_Internal( entity trigger, entity ent )
 			if( IsValid( ent ) )
 			{
 				//Warning( "setting to none" )
-				ent.e.portalDirection = eDirection.NONE
+				ent.e.portalDirection = ePortalDirection.NONE
 			}
 		}
 	)
@@ -1186,10 +1107,12 @@ void function OnPhaseTunnelTriggerEnter_Internal( entity trigger, entity ent )
 	if ( PHASE_TUNNEL_DEBUG_DRAW_PROJECTILE_TELEPORT )
 		DebugDrawCircle( portalData.startOrigin, portalData.endAngles, MAX_PORTAL_ENTER_DETECTION_RADIUS, 255, 0, 0, true, 10, 32 )
 	
-	ent.e.portalDirection = bEnteredFromEnd ? eDirection.ENDTOSTART : eDirection.STARTTOEND	
+	ent.e.portalDirection = bEnteredFromEnd ? ePortalDirection.ENDTOSTART : ePortalDirection.STARTTOEND	
 
 	//todo-iholstead: remove me once R5DEV-578675 is closed
-	printf("OnPhaseTunnelTriggerEnter_Internal called on "+ ent )
+	#if DEVELOPER
+		printf( "OnPhaseTunnelTriggerEnter_Internal called on " + ent )
+	#endif
 
 	waitthread PhaseTunnel_PhaseEntity( ent, tunnelEnt, file.tunnelData[ tunnelEnt ], portalData, travelState )
 }

@@ -1,6 +1,8 @@
 # To use the squirrel xml files with notepad++, follow these directions:
 
 
+############################################################### Theme ###############################################################
+
 First, you must use the VS-2019-Dark theme.
 
 Move 
@@ -11,18 +13,16 @@ into
 
 %appdata%\Notepad++\themes
 
-
-
-Style configurator:
+############################################################### Style configurator: ###############################################################
 
 1. Open notepad++
 2. From the menu nav located at top, select "Settings" -> "Style Configurator"
 3. Select theme: VS2019-Dark
 4. Make sure Foreground color is white and background color is black
-5. MAKE SURE the "Enable global background colour"  or "Force background color for all styles" box is checked. For newer versions you only need to force background color, and not foreground.
+5. MAKE SURE the "Enable global background colour"  or "Force background color for all styles" box is checked. For newer versions you only need to force background color, and not foreground. 
 
 
-Importing the language:
+############################################################### Importing the language: ###############################################################
 
 1. Click "Language" -> "User defined language" -> "Define your language"
 2. Click "Import..." near the top left. 
@@ -35,3 +35,17 @@ Reload:
 
 Any .nut or .gnut files opened from this point forward will automatically apply the style.
 If you have already opened files, they will not automaically apply, however, you can click "Language" -> "Squirrel" on the file to manually apply the opened file.
+
+
+############################################################### Lexxing for native functions ###############################################################
+
+1. In the top menu, Plugins -> Plugins Admin -> Search: EnhanceAnyLexer
+2. Install the EnhanceAnyLexer plugin
+
+3. Move: 
+
+\R5R Library\LIVE\platform\scripts\EnhanceAnyLexerConfig.ini
+
+into:
+
+%appdata%\Notepad++\plugins\config\EnhanceAnyLexer

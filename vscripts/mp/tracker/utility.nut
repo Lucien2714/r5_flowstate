@@ -63,6 +63,7 @@ global function ArrayUniqueInt
 global function ArrayUniqueString
 global function IsMapPlaylistGamemodeRotationEnabled
 global function DecideNextMapPlaylistGamemodeRotation
+global function IsValidCharacterGUID
 global function TP
 
 //code callbacks
@@ -415,7 +416,7 @@ void function TrackerUtilityInit()
 		string pair
 
 		#if TRACKER && HAS_TRACKER_DLL
-			admins_list = TrackerGetSetting( "settings.ADMINS" )
+			admins_list = TrackerGetSettingString( "settings.ADMINS" )
 		#endif
 
 		if( admins_list != "" )
@@ -1399,7 +1400,7 @@ void function TrackerUtilityInit()
 					try
 					{
 						string return_str = ""
-						return_str = TrackerGetSetting( param )
+						return_str = TrackerGetSettingString( param )
 
 						Message( player, param + ":", return_str )
 						return true
@@ -2840,7 +2841,7 @@ string function ParseWeapon( string weaponString )
 {
 	array<string> mods = split( strip( weaponString ), " " )
 
-	if( mods.len() < 1 )
+	if( !mods.len() )
 		return ""
 
 	if( !IsWeaponValid( mods[ 0 ] ) || !( SURVIVAL_Loot_IsRefValid( mods[ 0 ] ) ) )
@@ -2849,11 +2850,22 @@ string function ParseWeapon( string weaponString )
 	bool removed = false
 	for ( int i = mods.len() - 1 ; i >= 1; i-- )
 	{
-		if ( !SURVIVAL_Loot_IsRefValid( mods[ i ] )
-		|| !IsModValidForWeapon( mods[ 0 ], mods[ i ] ) )
+		if ( !SURVIVAL_Loot_IsRefValid( mods[ i ] ) )
 		{
 			removed = true
-			sqprint( "removed:", mods[ i ] )
+			sqprint( "removed invalid ref:", mods[ i ] )
+			mods.remove( i )
+		}
+		else if( !IsModValidForWeapon( mods[ 0 ], mods[ i ] ) )
+		{
+			removed = true
+			sqprint( format( "removed invalid mod \"%s\" for weapon \"%s\" )", mods[ i ], mods[ 0 ] ) )
+			mods.remove( i )
+		}
+		else if( SURVIVAL_Loot_IsRefDisabled( mods[ i ] ) )
+		{
+			removed = true
+			sqprint( format( "removed disabled ref \"%s\"", mods[ i ] ) )
 			mods.remove( i )
 		}
 	}
@@ -3663,10 +3675,8 @@ void function DecideNextMapPlaylistGamemodeRotation()
 		rotationIndexToLoad = ( currentRotationIndex + 1 + i ) % rotationMaxIndex
 		rotationDataToLoad = file.allRotationData[ rotationIndexToLoad ]
 
-		if( playerCount >= rotationDataToLoad.minplayers && playerCount <= rotationDataToLoad.maxplayers )
+		if( playerCount >= rotationDataToLoad.minplayers && ( rotationDataToLoad.maxplayers <= 0 || playerCount <= rotationDataToLoad.maxplayers ) )
 			break
-
-		currentRotationIndex++
 	}
 
 	Dev_CommandLineAddParm( "playlistOverride", rotationDataToLoad.playlist )
@@ -3749,3 +3759,22 @@ void function RuleReminders_Init(){
 		)()
 	}
 #endif
+
+bool function IsValidCharacterGUID( int characterGUID, entity player )
+{
+	ItemFlavor ornull characterOrNull = GetItemFlavorOrNullByGUID( characterGUID )
+	if( characterOrNull == null )
+		return false
+
+	expect ItemFlavor ( characterOrNull )
+	if( ItemFlavor_GetType( characterOrNull ) != eItemType.character )
+		return false
+
+	if( !ItemFlavor_ShouldBeVisible( characterOrNull, player ) )
+		return false
+
+	if( !ItemFlavor_IsAvailableInPlaylist( characterOrNull ) )
+		return false
+
+	return true
+}

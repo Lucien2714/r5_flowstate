@@ -2307,9 +2307,11 @@ void function OnLockStepPlayerIndexChanged( entity player, int oldValue, int new
 	{
 		if ( fileLevel.countdownRui != null )
 		{
-			try{
+			try
+			{
 				RuiSetInt( fileLevel.countdownRui, "yourPick", newValue + 1 )
-			} catch( e420 )
+			} 
+			catch( e420 )
 			{
 				Warning( "[BUG THIS] UI character_select_name_plate_new doesn't expose argument yourPick as an int" )
 			}
@@ -3172,7 +3174,11 @@ void function UpdatePlayerAnim( ItemFlavor character, int currentMenuState )
 
 		entity player = GetLocalClientPlayer()
 		
-		int ThisRoundAnim = RandomIntRangeInclusive( 0, GetAllGoodAnimsFromGladcardStancesForCharacter( character ).len() - 1 )
+		int animSelectLen = GetAllGoodAnimsFromGladcardStancesForCharacter( character ).len() - 1
+		if( animSelectLen < 1 )
+			return
+		
+		int ThisRoundAnim = RandomIntRangeInclusive( 0, animSelectLen )
 		array<ItemFlavor> animsforthischaracter = GetAllGoodAnimsFromGladcardStancesForCharacter( character )		
 		Signal( fileLevel.signalDummy, "UpdatingAnim" )
 		EndSignal( fileLevel.signalDummy, "UpdatingAnim" )
@@ -3364,7 +3370,7 @@ bool function CharacterSelect_AssignCharacter( entity player, ItemFlavor charact
 		#endif
 	}
 
-	if( Gamemode() != eGamemodes.WINTEREXPRESS )
+	if( Gamemode() != eGamemodes.WINTEREXPRESS && !IsDevGamemode() )
 		player.SetPlayerNetBool( "hasLockedInCharacter", true )
 	
 	if( ItemFlavor_GetHumanReadableRef( character ) == "character_wattson" )

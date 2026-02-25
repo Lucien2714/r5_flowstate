@@ -178,6 +178,7 @@ struct
 	bool TEMP_circularReferenceCleanupEnabled = true
 
 	table<string, int> t_persistenceAttempts
+	
 } file
 
 
@@ -695,7 +696,6 @@ void function UICodeCallback_OnConnected()
 {
 	//InitXPEvents()
 }
-
 
 void function UICodeCallback_OnFocusChanged( var oldFocus, var newFocus )
 {

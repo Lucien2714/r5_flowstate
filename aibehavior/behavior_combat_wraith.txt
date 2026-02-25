@@ -4,7 +4,10 @@ Selector Common
 	// SelectSchedule_ReactSurprised
 	SelectSchedule_ReactBullet
 	SelectSchedule_LayeredBehavior
-	// SelectSchedule_ReactJumpedOver
+	SelectSchedule_ReactJumpedOver
+	SelectSchedule_ChangeToDesiredStance
+	SelectSchedule_SyncedMeleeAttack
+	SelectSchedule_PressToInitiateSyncedMeleeAttack
 Selector_End
 
 
@@ -15,6 +18,7 @@ Selector_End
 
 Selector Alert
 	SelectSchedule_Alert
+	SelectSchedule_ShootingCover
 Selector_End
 
 
@@ -25,16 +29,20 @@ Selector Combat
 	SelectSchedule_EnemyAimDodge
 	// SelectSchedule_MoveToWeaponRange
 	// SelectSchedule_Reposition
+	SelectSchedule_ShootingCover
 	SelectSchedule_ChaseEnemy
 	SelectSchedule_EngagementDistMin
 	SelectSchedule_MeleeAttack
 	SelectSchedule_RangeAttack
+	SelectSchedule_RangeAttackEvasive
+	SelectSchedule_RangeAttackTwitch
 	// SelectSchedule_WeaponBlocked
-	// SelectSchedule_BreakEnemyLosIfOutsideEngageDist
-	// SelectSchedule_CantSeeEnemy
-	// SelectSchedule_EngagementDistMax
-	// SelectSchedule_CombatFace
+	SelectSchedule_BreakEnemyLosIfOutsideEngageDist
+	SelectSchedule_CantSeeEnemy
+	SelectSchedule_EngagementDistMax
+	SelectSchedule_CombatFace
 	SelectSchedule_ChaseEnemy
-	// SelectSchedule_EnemyTooClose
+	SelectSchedule_EnemyTooClose
+	SelectSchedule_AtEnemyLKP
 	
 Selector_End

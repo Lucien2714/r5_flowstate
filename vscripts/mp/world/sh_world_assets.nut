@@ -347,7 +347,7 @@ void function WorldAssets_Init()
 	file._bAssetGroups_Loaded = true
 }
 
-bool function WorldAssets_DoesSignalExist( string signal )
+bool function WorldAssets_DoesSignalExist( string signal ) // could have used IsValidSignal()
 {
 	return ( signal in file.groupSignals )
 }

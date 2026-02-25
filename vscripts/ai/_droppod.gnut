@@ -64,6 +64,9 @@ var function SpawnBeacon( entity ownerPlayer, vector origin, vector angles )
 
 void function AirDropPingMinimap( entity dropPod, vector origin, string animationName )
 {
+	if( Playlist() == ePlaylists.fs_realistic_ttv )//TEMP: TODO(mk): Remove this after remote func update next r5r season ( to register ServerCallback_SUR_PingMinimap for realistic mode in remote funcs )
+		return
+
 	// Show up for twice as long so there's enough time for everyone to find
 	// it on the minimap after it has landed.
 	float pingDuration = dropPod.GetSequenceDuration( animationName ) * 2

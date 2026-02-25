@@ -55,18 +55,20 @@ global function Tracker_FetchPlayerData
 global function Tracker_SavePlayerData
 global function Tracker_SetStartLog
 global function Tracker_UpdateMOTDTextForPlayer
-global function TrackerGetSetting
+global function TrackerGetSettingString
 global function TrackerGetSettingBool
 global function TrackerGetSettingInt
 global function TrackerGetSettingFloat
-global function SendServerMessageToPlayer
-global function SendServerMessage
 global function Tracker_RegisterTrackingAsNonCombatMode
 global function Tracker_AddDestroyStatCallback
-
-global function SetAfkToRest
+global function Tracker_SetShouldShip
+global function Tracker_ShouldShip
+global function Tracker_UpdateAtInterval
 global function ClientCommand_RequestStat
 
+global function SendServerMessageToPlayer
+global function SendServerMessage
+global function SetAfkToRest
 global function bAfkToRest
 global function bGlobalStats
 global function bLog
@@ -197,7 +199,6 @@ global function Tracker_IsRestrictedServer
 global function Tracker_SetRestrictedServer
 global function Tracker_SetForceUpdatePlayerData
 global function Tracker_GetStartUnixTime
-global function Tracker_SetShouldShip
 
 global function Tracker_ReturnSuperglides
 global function Tracker_ReturnKills
@@ -323,9 +324,9 @@ struct PlayerMetrics
 	string playername
 	entity ent
 	
-    array<float> JumpTimestamps //internal only
-    table<int, array< float > > WeaponShotsTimestamps //internal only
-	array<float> SuperglideTimestamps //internal only
+    array< float > JumpTimestamps //internal only
+    table< int, array< float > > WeaponShotsTimestamps //internal only
+	array< float > SuperglideTimestamps //internal only
 	
 	int kills
 	int deaths
@@ -342,16 +343,6 @@ struct PlayerMetrics
 	
 	bool isValid
 }
-
-//tables
-table< string, bool > PlayerDidJump
-table< string, int > PlayerIdMap
-
-//script arrays
-array< DamageEvent > allDamageEvents
-table< int, DamageEvent > allDamageEventsMap = {}
-array< PlayerMetrics > PlayerMetricsArray
-array< PlayerVerifyCount > playerVerifyCounts
 
 struct PlayerData 
 {
@@ -372,22 +363,28 @@ struct //Todo: move appropriate to tracker.var
 	
 	//queries 
 	bool bQueryComplete = false
-	table <string, array<void functionref( string retData )> > queryStringInitFuncs
-	table <string, array<void functionref( string retData )> > queryStringCallbackFuncs
-	table <string,string> Global_R5RDEV_StringSettings
-	table <string,float> Global_R5RDEV_FloatSettings
-	table <string,int> Global_R5RDEV_IntSettings
-	table <string,bool> Global_R5RDEV_BoolSettings
+	table < string, array< void functionref( string retData ) > > queryStringInitFuncs
+	table < string, array< void functionref( string retData ) > > queryStringCallbackFuncs
+	table < string, string > Global_R5RDEV_StringSettings
+	table < string, float > Global_R5RDEV_FloatSettings
+	table < string, int > Global_R5RDEV_IntSettings
+	table < string, bool > Global_R5RDEV_BoolSettings
 	
-	table<string, array<void functionref( entity player, string data )> > PlayerSettingsMap
-	table<string, table<string,string> > PlayerData// playerUID = setting,value
-	array<void functionref( entity player ) > syncDataFullyLoadedCallbacks
-	table<string, array< void functionref(entity player) > > registeredStatCallbackFuncs
-	array<void functionref() > batchStatsLoadedCallbacks
-	array<void functionref() > destroyStatCallbacks
-	array<string> statsLocalAllowed
+	table< string, array<void functionref( entity player, string data )> > PlayerSettingsMap
+	table< string, table<string,string> > PlayerData// playerUID = setting,value
+	array< void functionref( entity player ) > syncDataFullyLoadedCallbacks
+	table< string, array< void functionref(entity player) > > registeredStatCallbackFuncs
+	array< void functionref() > batchStatsLoadedCallbacks
+	array< void functionref() > destroyStatCallbacks
+	array< string > statsLocalAllowed
+	table< string, int > PlayerIdMap	
+	table< string, bool > PlayerDidJump
+	array< PlayerVerifyCount > playerVerifyCounts	
+	array< string > requestedStatsArray
+	array< PlayerMetrics > PlayerMetricsArray
+	array< DamageEvent > allDamageEvents
+	table< int, DamageEvent > allDamageEventsMap
 	
-	array<string> requestedStatsArray
 	bool _registerAllSettings
 	float maxWaitForBatchLoad
 	
@@ -413,6 +410,7 @@ struct //Todo: move appropriate to tracker.var
 	bool stats_discord_webhook_matches_enabled
 	bool bClientCommandAdminEnabled
 	bool bLiveMetricsOnlyForNonCombatMode
+	bool bUpdateIntervalThreadRunning
 	
 	bool sg_counter_msg
 	float FS_MaxHealth
@@ -656,7 +654,7 @@ void function Tracker_RegisterTrackingAsNonCombatMode( bool setting )
 
 array<PlayerMetrics> function Tracker_GetPlayerMetricsArray()
 {
-	return PlayerMetricsArray
+	return file.PlayerMetricsArray
 }
 
 void function DEV_ManualLogStart()
@@ -788,6 +786,11 @@ void function Tracker_SetShouldShip( bool value )
 	file.bShouldShip = value
 }
 
+bool function Tracker_ShouldShip()
+{
+	return file.bShouldShip
+}
+
 string function GetPlayerUIDFromHandle( int handle )
 {
 	if( handle in file.HandleToPlayerData )
@@ -868,19 +871,19 @@ bool function Tracker_StatExists( string stat )
 }
 
 // These are for r5rdev_config.json
-string function TrackerGetSetting( string key )
+string function TrackerGetSettingString( string key )
 {
 	return TrackerGetSetting__internal( key )
 }
 
 bool function TrackerGetSettingBool( string key )
 {
-	return TrackerGetSetting( key ) == "true"
+	return TrackerGetSettingString( key ) == "true"
 }
 
 int function TrackerGetSettingInt( string key )
 {
-	string setting = TrackerGetSetting( key )
+	string setting = TrackerGetSettingString( key )
 	if( IsStringNumeric( setting ) )
 		return setting.tointeger()
 	
@@ -889,7 +892,7 @@ int function TrackerGetSettingInt( string key )
 
 float function TrackerGetSettingFloat( string key )
 {
-	string setting = TrackerGetSetting( key )
+	string setting = TrackerGetSettingString( key )
 	if( IsStringNumeric( setting ) )
 		return setting.tofloat()
 	
@@ -1258,38 +1261,38 @@ bool function Tracker_StatLocalAllowed( string statKey )
 
 var function Tracker_ReturnSuperglides( string uid )
 {
-	return PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].SuperglideTimestamps.len()
+	return file.PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].SuperglideTimestamps.len()
 }
 
 var function Tracker_ReturnKills( string uid )
 {
-	return PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].kills
+	return file.PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].kills
 }
 
 var function Tracker_ReturnDeaths( string uid )
 {
-	return PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].deaths
+	return file.PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].deaths
 }
 
 var function Tracker_ReturnShots( string uid )
 {
-	return PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].shots
+	return file.PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].shots
 }
 
 var function Tracker_ReturnHits( string uid )
 {
-	return PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].hits
+	return file.PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].hits
 }
 
 
 var function Tracker_ReturnDamage( string uid )
 {	//backend is registered as an int.
-	return int( PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].damage )
+	return int( file.PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].damage )
 }
 
 var function Tracker_ReturnChampion( string uid )
 {
-	return PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].previous_champion
+	return file.PlayerMetricsArray[ GetPlayerMetricsIndexByUID( uid ) ].previous_champion
 }
 
 void function Tracker_SetPlayerAsChampion( entity player )
@@ -1467,10 +1470,10 @@ void function __DestroyStats()
 	file.bShouldShip = false
 	file.bStatsShipped = false
 	
-	allDamageEvents = []
-	PlayerMetricsArray = []
-	playerVerifyCounts = []
-	PlayerIdMap = {}
+	file.allDamageEvents = []
+	file.PlayerMetricsArray = []
+	file.playerVerifyCounts = []
+	file.PlayerIdMap = {}
 	Stats__ClearOutboundCache()
 	
 	foreach( string uid, StatsTable statsTbl in Stats__GetRoundStatsTables() )
@@ -1593,7 +1596,7 @@ void function PIN_Init()
 	}
 	
 	if ( TrackerGetSettingBool( "server.EA_VERIFY_SERVER" ) && GetConVarInt( "sv_onlineAuthEnable" ) == 1 ) //You should not attempt to enable this, the backend will verify..
-		AddClientCommandCallback( "ea_verify", ClientCommand_mkos_ea_verify )
+		AddClientCommandCallback( "ea_verify", ClientCommand_TrackerVerifyAccount )
 	
 	//initialize array/table maps
 	
@@ -1667,12 +1670,12 @@ void function Tracker_SettingsInit()
 	file.bClientCommandAdminEnabled					= GetConVarInt( "sv_onlineAuthEnable" ) == 1 && GetCurrentPlaylistVarBool( "cc_administration", false )
 	file.flowstateRoundtime 						= GetCurrentPlaylistVarInt( "flowstateRoundtime", 1800 )
 	file.afk_to_rest_enabled 						= GetCurrentPlaylistVarBool( "afk_to_rest_bool", false )
-	file.update_discord_player_counts 				= TrackerGetSetting( "webhooks.PLAYERS_WEBHOOK" ) != ""
-	file.stats_discord_webhook_matches_enabled		= TrackerGetSetting( "webhooks.MATCHES_WEBHOOK" ) != ""
+	file.update_discord_player_counts 				= TrackerGetSettingString( "webhooks.PLAYERS_WEBHOOK" ) != ""
+	file.stats_discord_webhook_matches_enabled		= TrackerGetSettingString( "webhooks.MATCHES_WEBHOOK" ) != ""
 	file.gamemode_type_1v1 							= g_bIs1v1GameType() //returns true if mode is confifugred as 1v1 type
 	
 	if( file.bChatbotEnabled )
-		file.msgBotPrefix = TrackerGetSetting( "settings.CHATBOT_PREFIX" )
+		file.msgBotPrefix = TrackerGetSettingString( "settings.CHATBOT_PREFIX" )
 	
 	//init stat bools (must be before string inits) todo: cleanup
 	file.global_stats 						= TrackerGetSettingBool( "server.USE_GLOBAL_STATS" )
@@ -1682,9 +1685,9 @@ void function Tracker_SettingsInit()
 	file.restricted_whitelist_only			= TrackerGetSettingBool( "private.RESTRICTED_WHITELIST_ONLY" )
 	
 	//messages
-	file.restricted_join_message 			= TrackerGetSetting( "private.RESTRICTED_JOIN_MESSAGE" )
-	file.restricted_whitelist_message 		= TrackerGetSetting( "private.RESTRICTED_WHITELIST_MESSAGE" )
-	file.restricted_admin_message 			= TrackerGetSetting( "private.RESTRICTED_ADMIN_MESSAGE" )
+	file.restricted_join_message 			= TrackerGetSettingString( "private.RESTRICTED_JOIN_MESSAGE" )
+	file.restricted_whitelist_message 		= TrackerGetSettingString( "private.RESTRICTED_WHITELIST_MESSAGE" )
+	file.restricted_admin_message 			= TrackerGetSettingString( "private.RESTRICTED_ADMIN_MESSAGE" )
 	
 	//vetting vars
 	file.restricted_gamesplayed 			= TrackerGetSettingInt( "private.RESTRICTED_GAMESPLAYED" )
@@ -1938,7 +1941,7 @@ void function PlayerWhitelistInit()
 {
 	file.whitelist.clear()
 
-	string whitelistString = TrackerGetSetting( "private.RESTRICTED_PLAYER_WHITELIST" )	
+	string whitelistString = TrackerGetSettingString( "private.RESTRICTED_PLAYER_WHITELIST" )	
 	if ( !empty( whitelistString ) )
 	{
 		try
@@ -2101,7 +2104,7 @@ void function BroadcastIntervalMessagesInit()
 
 	bool gotoLoopMessage = false
 
-	string msg_ArrayString = strip( TrackerGetSetting( "settings.INTERVAL_MESSAGES" ) )	
+	string msg_ArrayString = strip( TrackerGetSettingString( "settings.INTERVAL_MESSAGES" ) )	
 	if( msg_ArrayString.len() == 0 )
 		gotoLoopMessage = true
 	
@@ -2186,7 +2189,7 @@ void function BroadcastIntervalMessagesInit()
 	
 	//loop messages (every x seconds)
 	
-	string loopTime = TrackerGetSetting( "settings.LOOP_MESSAGES_INTERVAL" )
+	string loopTime = TrackerGetSettingString( "settings.LOOP_MESSAGES_INTERVAL" )
 	
 	if( !empty( loopTime ) && IsStringNumeric( loopTime ) )
 	{
@@ -2207,7 +2210,7 @@ void function BroadcastIntervalMessagesInit()
 		sqprint( format( "file.iBotMessagesLoopTime is: %d ", file.iBotMessagesLoopTime ) )
 	#endif
 		
-	string getLoopMessages = TrackerGetSetting( "settings.LOOP_MESSAGES" )
+	string getLoopMessages = TrackerGetSettingString( "settings.LOOP_MESSAGES" )
 
 	if ( !empty( getLoopMessages ) )
 	{
@@ -2450,10 +2453,10 @@ DamageEvent function Tracker_CreateDamageEvent( int weaponSource, float damage, 
 	
 	int attackerEventID = eventID( attackerHandle, victimHandle ) 
 	
-	if( attackerEventID in allDamageEventsMap )
-		allDamageEventsMap[ attackerEventID ] = event
+	if( attackerEventID in file.allDamageEventsMap )
+		file.allDamageEventsMap[ attackerEventID ] = event
 	else
-		allDamageEventsMap[ attackerEventID ] <- event
+		file.allDamageEventsMap[ attackerEventID ] <- event
 	
     return event
 }
@@ -2610,7 +2613,7 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 		int attackerSuperglides = 0
 		
 		// collect all DamageEvents on victim and calculate total damage
-		foreach ( DamageEvent event in allDamageEvents ) 
+		foreach ( DamageEvent event in file.allDamageEvents ) 
 		{
 			if ( event.victimHandle == victim_handle )
 			{
@@ -2728,7 +2731,7 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 		
 		if ( !file.gamemode_type_1v1 && totalDamageToVictim < file.FS_MaxHealth ) 
 		{
-			foreach ( int eventIndex, DamageEvent event in allDamageEvents ) 
+			foreach ( int eventIndex, DamageEvent event in file.allDamageEvents ) 
 			{			
 				attackerName = GetPlayerNameFromHandle( event.attackerHandle )
 				
@@ -2785,7 +2788,7 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 		////////////////////////////////// 		victim			/////////////////////////////////
 		/////////////////////////////////////////////////////////////////////////////////////////
 		
-		foreach ( int eventIndex, DamageEvent event in allDamageEvents ) 
+		foreach ( int eventIndex, DamageEvent event in file.allDamageEvents ) 
 		{
 			if ( event.attackerHandle == victim_handle && ( file.gamemode_type_1v1 || deathtime - event.actionTimestamp <= timeWindow ) ) 
 			{					
@@ -2838,10 +2841,10 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 			
 			if ( attackerIndex != -1 ) 
 			{
-				attackerJumps = CountEventsWithinTimeframe( PlayerMetricsArray[ attackerIndex ].JumpTimestamps, fightStartTime - jumpgrace, fightEndTime )
-				attackerSuperglides = CountEventsWithinTimeframe( PlayerMetricsArray[ attackerIndex ].SuperglideTimestamps, fightStartTime - glidegrace, fightEndTime )
+				attackerJumps = CountEventsWithinTimeframe( file.PlayerMetricsArray[ attackerIndex ].JumpTimestamps, fightStartTime - jumpgrace, fightEndTime )
+				attackerSuperglides = CountEventsWithinTimeframe( file.PlayerMetricsArray[ attackerIndex ].SuperglideTimestamps, fightStartTime - glidegrace, fightEndTime )
 				
-				foreach ( weapon, timestamps in PlayerMetricsArray[ attackerIndex ].WeaponShotsTimestamps ) 
+				foreach ( weapon, timestamps in file.PlayerMetricsArray[ attackerIndex ].WeaponShotsTimestamps ) 
 				{	
 					int event_hitcount = CountEventsWithinTimeframe( timestamps, fightStartTime, fightEndTime )
 					
@@ -2891,10 +2894,10 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 		
 		if ( victimIndex != -1 ) 
 		{
-			victimTotalJumps = CountEventsWithinTimeframe( PlayerMetricsArray[ victimIndex ].JumpTimestamps, fightStartTime - jumpgrace, fightEndTime )
-			victimSuperglides = CountEventsWithinTimeframe( PlayerMetricsArray[ victimIndex ].SuperglideTimestamps, fightStartTime - glidegrace, fightEndTime )
+			victimTotalJumps = CountEventsWithinTimeframe( file.PlayerMetricsArray[ victimIndex ].JumpTimestamps, fightStartTime - jumpgrace, fightEndTime )
+			victimSuperglides = CountEventsWithinTimeframe( file.PlayerMetricsArray[ victimIndex ].SuperglideTimestamps, fightStartTime - glidegrace, fightEndTime )
 			
-			foreach ( weapon, timestamps in PlayerMetricsArray[ victimIndex ].WeaponShotsTimestamps ) 
+			foreach ( weapon, timestamps in file.PlayerMetricsArray[ victimIndex ].WeaponShotsTimestamps ) 
 			{	
 				int event_hitcount = CountEventsWithinTimeframe( timestamps, fightStartTime, fightEndTime )
 				
@@ -3078,19 +3081,19 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 		int killerOnVictimEventID = eventID( killer_attacker_handle, dead_victim_handle )
 		int victimOnKillerEventID = eventID( dead_victim_handle, killer_attacker_handle )
 		
-		if( killerOnVictimEventID in allDamageEventsMap ) 
-			allDamageEventsMap[ killerOnVictimEventID ] = nullevent
+		if( killerOnVictimEventID in file.allDamageEventsMap ) 
+			file.allDamageEventsMap[ killerOnVictimEventID ] = nullevent
 			
-		if( victimOnKillerEventID in allDamageEventsMap )
-			allDamageEventsMap[ victimOnKillerEventID ] = nullevent
+		if( victimOnKillerEventID in file.allDamageEventsMap )
+			file.allDamageEventsMap[ victimOnKillerEventID ] = nullevent
   
-		for ( int i = allDamageEvents.len() - 1; i >= 0; --i ) 
+		for ( int i = file.allDamageEvents.len() - 1; i >= 0; --i ) 
 		{
 			if ( file.gamemode_type_1v1 ) 
 			{
-				if ( allDamageEvents[i].attackerHandle == dead_victim_handle || allDamageEvents[i].attackerHandle == killer_attacker_handle ) 
+				if ( file.allDamageEvents[i].attackerHandle == dead_victim_handle || file.allDamageEvents[i].attackerHandle == killer_attacker_handle ) 
 				{
-					allDamageEvents.remove(i)
+					file.allDamageEvents.remove(i)
 					#if DEVELOPER 
 						removed++;
 					#endif 
@@ -3098,9 +3101,9 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 			}
 			else
 			{
-				if ( Time() - fightEndTime > MAX_FIGHT_HISTORY_TIME || allDamageEvents[i].victimHandle == dead_victim_handle ) 
+				if ( Time() - fightEndTime > MAX_FIGHT_HISTORY_TIME || file.allDamageEvents[i].victimHandle == dead_victim_handle ) 
 				{          
-					allDamageEvents.remove(i)
+					file.allDamageEvents.remove(i)
 					#if DEVELOPER 
 						removed++;
 					#endif
@@ -3109,10 +3112,10 @@ void function RemoveDamageEvents( int attacker_handle, int victim_handle ) //Tod
 		}
 
 		#if DEVELOPER && DEBUGDMG
-			foreach ( event in allDamageEvents ) 
+			foreach ( event in file.allDamageEvents ) 
 				sqprint( format( "Tracker: Remaining event handle: dealer: %d, reciever: %d ", event.attackerHandle, event.victimHandle ) )
 					
-			sqprint( format( "Tracker: Total remaining events: %d, Total removed: %d", allDamageEvents.len(), removed ) )
+			sqprint( format( "Tracker: Total remaining events: %d, Total removed: %d", file.allDamageEvents.len(), removed ) )
 		#endif
 	}
 	
@@ -3275,8 +3278,8 @@ DamageEvent function Tracker_GetRecentDamageEvent( int eventID )
 {
 	DamageEvent event
 	
-	if( eventID in allDamageEventsMap )
-		return allDamageEventsMap[ eventID ]
+	if( eventID in file.allDamageEventsMap )
+		return file.allDamageEventsMap[ eventID ]
 	
 	return event
 }
@@ -3320,8 +3323,8 @@ DamageEvent function Tracker_GetRecentDamageEvent( int eventID )
 	
 	void function DEV_PrintDamageMap()
 	{
-		printt( "Tracker: DEV_PrintDamageEvent length:", allDamageEventsMap.len() )
-		foreach( int identifier, DamageEvent event in allDamageEventsMap )
+		printt( "Tracker: DEV_PrintDamageEvent length:", file.allDamageEventsMap.len() )
+		foreach( int identifier, DamageEvent event in file.allDamageEventsMap )
 		{
 			printt( "Tracker: event identifier:", identifier )
 			DEV_PrintDamageEvent( event )
@@ -3439,7 +3442,7 @@ void function Tracker_OnPlayerDamaged( entity victim, var damageInfo )
             newEvent.weaponOrder.append( weaponSource )
             newEvent.shotIdentifier = shotIdentifier
             Tracker_HandleDamage( newEvent, attacker, weaponSource, damageAmount, damageInfo, victim )
-            allDamageEvents.append( newEvent )
+            file.allDamageEvents.append( newEvent )
         }
 		else 
 		{
@@ -3456,13 +3459,13 @@ void function Tracker_OnPlayerDamaged( entity victim, var damageInfo )
         newEvent.weaponOrder.append( weaponSource )
         newEvent.shotIdentifier = shotIdentifier
         Tracker_HandleDamage( newEvent, attacker, weaponSource, damageAmount, damageInfo, victim )
-        allDamageEvents.append( newEvent )
+        file.allDamageEvents.append( newEvent )
     }
 
     
 	#if DEVELOPER && DEBUGDMG
-		printt( "Tracker: Current Damage Events:", allDamageEvents.len(), "\n" )	
-		foreach( DamageEvent event in allDamageEvents ) 
+		printt( "Tracker: Current Damage Events:", file.allDamageEvents.len(), "\n" )	
+		foreach( DamageEvent event in file.allDamageEvents ) 
 			print
 			( 
 				format
@@ -3504,7 +3507,7 @@ DamageEvent function Tracker_GetCurrentEventForAttackerOnVictim( int attackerHan
 
 DamageEvent function Tracker_GetCurrentEventByPlayerHandle_expensive( int playerHandle, bool attacker = true )
 {	
-	int dmgEventLen = allDamageEvents.len()
+	int dmgEventLen = file.allDamageEvents.len()
 	
 	if( dmgEventLen > 0 )
 	{
@@ -3512,16 +3515,16 @@ DamageEvent function Tracker_GetCurrentEventByPlayerHandle_expensive( int player
 		{
 			if( attacker )
 			{
-				if ( allDamageEvents[i].attackerHandle == playerHandle )
+				if ( file.allDamageEvents[i].attackerHandle == playerHandle )
 				{
-					return allDamageEvents[i]
+					return file.allDamageEvents[i]
 				}
 			}
 			else 
 			{
-				if ( allDamageEvents[i].victimHandle == playerHandle )
+				if ( file.allDamageEvents[i].victimHandle == playerHandle )
 				{
-					return allDamageEvents[i]
+					return file.allDamageEvents[i]
 				}
 			}
 		}
@@ -3542,140 +3545,119 @@ DamageEvent function Tracker_GetCurrentEventByPlayerHandle_expensive( int player
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 
-	//this blows  ( The reason for this madness is to prevent rejoining to bypass attempt throttle )
-	bool function ClientCommand_mkos_ea_verify( entity player, array<string> args )
-	{
-		if( !IsValid( player ) || !player.p.isConnected )
-			return true
-			
-		if( !CheckRate( player ) )
-			return true
-			
-		if( GetGameState() != eGameState.Playing )
-		{
-			LocalMsg( player, "#FS_GameNotPlaying" )
-			player.p.eaVerifyProcessing = false
-			return true
-		}
-		
-		if( player.p.eaVerifyProcessing == true )
-			return true
-		else
-			player.p.eaVerifyProcessing = true
-			
-		if ( file.gamemode_type_1v1 && Time() < player.p.lastRestUsedTime + 3 ) 
-		{
-			LocalEventMsg( player, "#FS_RESTCOOLDOWN" )
-			player.p.eaVerifyProcessing = false
-			return true
-		}
-			
-		string ea_acc = player.GetPlayerName()
-		string OID = player.GetPlatformUID()
-	
-		int index = -1
-		for ( int i = 0; i < playerVerifyCounts.len(); i++ ) 
-		{
-			if ( playerVerifyCounts[ i ].playerID == ea_acc ) 
-			{
-				index = i
-				break
-			}
-		}
+void function VerifyMessageToken( entity player, string token, string subToken = "#FS_NULL" )
+{
+	LocalMsg( player, token, subToken, eMsgUI.NOTIFICATION, 10.0 )
+}
 
-		if ( index == -1 ) 
-		{
-			PlayerVerifyCount newEntry
-			newEntry.playerID = ea_acc
-			newEntry.verifyCount = 0
-			playerVerifyCounts.append( newEntry )
-			index = playerVerifyCounts.len() - 1
-		}
-		else if ( playerVerifyCounts[ index ].verifyCount >= 3 ) 
-		{
-			Message( player, "Too many attempts. Try again later." )
-			player.p.eaVerifyProcessing = false
-			return true
-		}
+void function VerifyMessage( entity player, string msgTitle, string msgBody = "" )
+{
+	LocalMsg( player, "#FS_NULL", "#FS_NULL", eMsgUI.NOTIFICATION, 10.0, "\n" + msgTitle, "\n" + msgBody )
+}
+
+//this blows  ( The reason for this madness is to prevent rejoining to bypass attempt throttle )
+bool function ClientCommand_TrackerVerifyAccount( entity player, array<string> args )
+{
+	if( !IsValid( player ) || !player.p.isConnected )
+		return true
 		
-		if ( args.len() < 1 || empty( args[ 0 ] ) )
-		{
-			Message( player, "Token from R5R.DEV is required." )
-			player.p.eaVerifyProcessing = false
-			return true
-		}
+	if( !CheckRate( player ) )
+		return true
 	
-		thread __PlayerEA_Verify( player, args, index, ea_acc, OID )	
+	if( player.p.eaVerifyProcessing == true )
+		return true
+	else
+		player.p.eaVerifyProcessing = true
+		
+	string ea_acc = player.GetPlayerName()
+	string OID = player.GetPlatformUID()
+
+	int index = -1
+	for ( int i = 0; i < file.playerVerifyCounts.len(); i++ ) 
+	{
+		if ( file.playerVerifyCounts[ i ].playerID == ea_acc ) 
+		{
+			index = i
+			break
+		}
+	}
+
+	if ( index == -1 ) 
+	{
+		PlayerVerifyCount newEntry
+		newEntry.playerID = ea_acc
+		newEntry.verifyCount = 0
+		file.playerVerifyCounts.append( newEntry )
+		index = file.playerVerifyCounts.len() - 1
+	}
+	else if ( file.playerVerifyCounts[ index ].verifyCount >= 3 ) 
+	{
+		VerifyMessage( player, "Too many attempts", "Try again later." )
+		player.p.eaVerifyProcessing = false
 		return true
 	}
 	
-	void function __PlayerEA_Verify( entity player, array<string> args, int index, string ea_acc, string OID ) 
+	if ( args.len() < 1 || empty( args[ 0 ] ) )
 	{
-		if ( !IsValid( player ) || !player.p.isConnected )
-			return
-				
-		player.EndSignal( "OnDisconnected", "OnDestroy" )
-		
-		if ( file.gamemode_type_1v1 ) 
-		{
-			Remote_CallFunction_ByRef( player, "ForceScoreboardLoseFocus" )
-			Gamemode1v1_ForceRest( player )
-		}
+		VerifyMessage( player, "Error", "Token from R5R.DEV is required." )
+		player.p.eaVerifyProcessing = false
+		return true
+	}
 
-		playerVerifyCounts[ index ].verifyCount++
-		
-		string token = args[ 0 ]
-		TrackerEAVerify__internal( token, OID, ea_acc )
+	file.playerVerifyCounts[ index ].verifyCount++
+	TrackerEAVerify__internal( args[ 0 ], OID, ea_acc )
+
+	return true
+}
+
+void function CodeCallback_VerifyEaAccount( string oid, int token )
+{	
+	entity player = GetPlayerEntityByUID( oid )	
+	if( !IsValid( player ) )
+		return
+				
+	switch ( token )
+	{
+		case 10:
+			VerifyMessage( player, "Failed: Expired Token", "Please request a new one" )
+			break
+
+		case 2:
+			VerifyMessage( player, "Invalid token", "Usage: ea_verify   yourtoken" )
+			break
+
+		case 4:
+			VerifyMessage( player, "Failed", "EA Account already linked." )
+			break
+
+		case 1:
+			VerifyMessage( player, "SUCCESS", "Your account was successfully verified on R5R.DEV" )
+			break
+
+		case 5:
+			VerifyMessage( player, "Failed: ", "Database error on success" )
+			break
+
+		case 3:
+			VerifyMessage( player, "Failed: ", "DB error" )
+			break
+
+		case 6:
+			VerifyMessage( player, "Failed: ", "Missing Data" )
+			break
+
+		case 8:
+			VerifyMessage( player, "Failed: ", "CURL Error." )
+			break
+
+		case 0:
+		default:
+			VerifyMessage( player, "Failed", "Could not verify EA Account." )
+			break
 	}
 	
-	void function CodeCallback_VerifyEaAccount( string oid, int token )
-	{	
-		entity player = GetPlayerEntityByUID( oid )	
-		if( !IsValid( player ) )
-			return
-					
-		switch ( token )
-		{
-			case 10:
-				Message( player, "Failed: Expired Token", "Please request a new one" )
-				break
-
-			case 2:
-				Message( player, "Invalid token", "Usage: ea_verify   yourtoken" )
-				break
-
-			case 4:
-				Message( player, "Failed", "EA Account already linked." )
-				break
-
-			case 1:
-				Message( player, "SUCCESS", "Your account was successfully verified on R5R.DEV" )
-				break
-
-			case 5:
-				Message( player, "Failed: ", "Database error on success" )
-				break
-
-			case 3:
-				Message( player, "Failed: ", "DB error" )
-				break
-
-			case 6:
-				Message( player, "Failed: ", "Missing Data" )
-				break
-
-			case 8:
-				Message( player, "Failed: ", "CURL Error." )
-				break
-
-			case 0:
-			default:
-				Message( player, "Failed", "Could not verify EA Account." )
-				break
-		}
-		
-		player.p.eaVerifyProcessing = false
-	}
+	player.p.eaVerifyProcessing = false
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3727,7 +3709,7 @@ int function InitializePlayerMetricsStructForPlayer( entity player, string playe
 	NewMetrics.ignore_sync_flag = false
 	NewMetrics.isValid = true
 	
-	PlayerMetricsArray.append( NewMetrics )
+	file.PlayerMetricsArray.append( NewMetrics )
 	return PlayerMap_Insert( ID )	
 }
 
@@ -3743,29 +3725,29 @@ int function GetPlayerMetricsIndex( entity player )
 	if( !IsValid( player ) )
 		return -1
 	
-    if ( player.p.UID in PlayerIdMap ) 
-        return PlayerIdMap[ player.p.UID ]
+    if ( player.p.UID in file.PlayerIdMap ) 
+        return file.PlayerIdMap[ player.p.UID ]
 	
 	return InitializePlayerMetricsStructForPlayer( player )
 }
 
 bool function Tracker_IsPlayerMetricsInitialized( string uid )
 {
-	return ( uid in PlayerIdMap )
+	return ( uid in file.PlayerIdMap )
 }
 
 int function GetPlayerMetricsIndexByUID( string uid )
 {
-	if ( uid in PlayerIdMap ) 
-        return PlayerIdMap[ uid ]
+	if ( uid in file.PlayerIdMap ) 
+        return file.PlayerIdMap[ uid ]
 	
     return InitializePlayerMetricsStructForPlayerByUID( uid )
 }
 
 PlayerMetrics function __GetPlayerMetrics( int id )
 {
-	if( id > -1 && id < PlayerMetricsArray.len() )
-		return PlayerMetricsArray[ id ]
+	if( id > -1 && id < file.PlayerMetricsArray.len() )
+		return file.PlayerMetricsArray[ id ]
 	else 
 	{
 		#if DEVELOPER
@@ -3786,9 +3768,9 @@ PlayerMetrics function __GetPlayerMetrics( int id )
 
 int function PlayerMap_Insert( string uid ) 
 {
-    int index = PlayerMetricsArray.len() - 1
+    int index = file.PlayerMetricsArray.len() - 1
     
-	PlayerIdMap[ uid ] <- index	
+	file.PlayerIdMap[ uid ] <- index	
 	return index
 }
 
@@ -3803,14 +3785,14 @@ int function InitializePlayerMetricsStructForPlayerByUID( string playerID )
 void function RecordPlayerJump( entity player ) 
 {
     int index = GetPlayerMetricsIndex( player )	
-    PlayerMetricsArray[ index ].JumpTimestamps.append( Time() )
+    file.PlayerMetricsArray[ index ].JumpTimestamps.append( Time() )
 }
 
 
 void function RecordPlayerSuperglides( entity player ) 
 {
     int index = GetPlayerMetricsIndex( player )
-    PlayerMetricsArray[ index ].SuperglideTimestamps.append( Time() )
+    file.PlayerMetricsArray[ index ].SuperglideTimestamps.append( Time() )
 }
 
 
@@ -3818,17 +3800,17 @@ void function RecordPlayerShot( entity player, int weaponSource )
 {
     int index = GetPlayerMetricsIndex( player )
 	
-	if ( !( weaponSource in PlayerMetricsArray[ index ].WeaponShotsTimestamps ) ) 
-		PlayerMetricsArray[ index ].WeaponShotsTimestamps[ weaponSource ] <- [ Time() ]
+	if ( !( weaponSource in file.PlayerMetricsArray[ index ].WeaponShotsTimestamps ) ) 
+		file.PlayerMetricsArray[ index ].WeaponShotsTimestamps[ weaponSource ] <- [ Time() ]
 	else 
-		PlayerMetricsArray[ index ].WeaponShotsTimestamps[ weaponSource ].append( Time() )
+		file.PlayerMetricsArray[ index ].WeaponShotsTimestamps[ weaponSource ].append( Time() )
 }
 
 
 void function AddToPlayerKills( string playerID )
 {	
 	int index = GetPlayerMetricsIndexByUID( playerID )	
-	PlayerMetricsArray[ index ].kills += 1		
+	file.PlayerMetricsArray[ index ].kills += 1		
 }
 
 
@@ -3838,26 +3820,26 @@ void function AddToPlayerDeaths( entity player )
 		// return 
 		
 	int index = GetPlayerMetricsIndex( player )	
-	PlayerMetricsArray[ index ].deaths += 1		
+	file.PlayerMetricsArray[ index ].deaths += 1		
 }
 
 
 void function AddToPlayerDamage( string playerID, float damage )
 {	
 	int index = GetPlayerMetricsIndexByUID( playerID )
-	PlayerMetricsArray[ index ].damage += damage	
+	file.PlayerMetricsArray[ index ].damage += damage	
 }
 
 void function AddToPlayerShots( string playerID, int shots )
 {
 	int index = GetPlayerMetricsIndexByUID( playerID )
-	PlayerMetricsArray[ index ].shots += shots	
+	file.PlayerMetricsArray[ index ].shots += shots	
 }
 
 void function AddToPlayerHits( string playerID, int hits )
 {
 	int index = GetPlayerMetricsIndexByUID( playerID )
-	PlayerMetricsArray[ index ].hits += hits
+	file.PlayerMetricsArray[ index ].hits += hits
 }
 
 
@@ -4035,7 +4017,7 @@ SerializedData function Tracker_BuildAllPlayerMetrics( bool trigger = false )
 	Tracker_RunStatResets()
 
     string json = "["
-    foreach ( index, metrics in PlayerMetricsArray ) 
+    foreach ( index, metrics in file.PlayerMetricsArray ) 
 	{
         if ( index > 0 )
             json += ", "
@@ -4225,7 +4207,7 @@ void function SetIgnoreSyncFlag( entity player )
 
 	try
 	{
-		PlayerMetricsArray[ index ].ignore_sync_flag = true
+		file.PlayerMetricsArray[ index ].ignore_sync_flag = true
 	}
 	catch(e){}
 }
@@ -4240,7 +4222,7 @@ bool function GetIgnoreSyncFlag( entity player )
 	int index = GetPlayerMetricsIndex( player )
 	
 	if( index != -1 )
-		return PlayerMetricsArray[index].ignore_sync_flag
+		return file.PlayerMetricsArray[index].ignore_sync_flag
 	
 	return false
 }
@@ -4254,7 +4236,7 @@ void function SetPlayerLeftFlag( entity player )
 	index = GetPlayerMetricsIndex( player ) //todo revisit..
 	
 	if ( index != -1 ) 
-		PlayerMetricsArray[ index ].playerleft = true
+		file.PlayerMetricsArray[ index ].playerleft = true
 }
 
 
@@ -4276,7 +4258,7 @@ bool function Tracker_GetPlayerLeftFlag( entity player )
 	int index = GetPlayerMetricsIndex( player )
 	
     if ( index != -1 ) 
-        return PlayerMetricsArray[ index ].hadleft
+        return file.PlayerMetricsArray[ index ].hadleft
 	
     return false
 }
@@ -4287,12 +4269,12 @@ bool function GetPlayerLeftFlag( entity player )
 	
     if ( index != -1 ) 
 	{	
-        bool left = PlayerMetricsArray[ index ].playerleft
+        bool left = file.PlayerMetricsArray[ index ].playerleft
 		
 		if( left )
 		{
-			PlayerMetricsArray[ index ].hadleft = true
-			PlayerMetricsArray[ index ].playerleft = false
+			file.PlayerMetricsArray[ index ].hadleft = true
+			file.PlayerMetricsArray[ index ].playerleft = false
 			return true
 		}
     }
@@ -4341,7 +4323,7 @@ int function GetPlayerKills( entity player )
     int index = GetPlayerMetricsIndex( player )
 	
     if ( index != -1 ) 
-        return PlayerMetricsArray[ index ].kills
+        return file.PlayerMetricsArray[ index ].kills
 	
     return 0
 }
@@ -4352,7 +4334,7 @@ float function GetPlayerDamage( entity player )
     int index = GetPlayerMetricsIndex( player )
 	
     if ( index != -1 ) 
-        return PlayerMetricsArray[ index ].damage
+        return file.PlayerMetricsArray[ index ].damage
 	
     return 0
 }
@@ -4363,7 +4345,7 @@ int function GetPlayerDeaths( entity player )
     int index = GetPlayerMetricsIndex( player )
 	
     if ( index != -1 ) 
-        return PlayerMetricsArray[ index ].deaths
+        return file.PlayerMetricsArray[ index ].deaths
 	
     return 0
 }
@@ -4384,22 +4366,22 @@ void function Flowstate_TrackingVision_SuperglideDetection_Stats(entity player)
 
 void function SetDidJump( entity player )
 {	
-	PlayerDidJump[ player.p.UID ] = true
+	file.PlayerDidJump[ player.p.UID ] = true
 }
 
 
 void function ResetJump( string playerID )
 {
-	PlayerDidJump[ playerID ] <- false
+	file.PlayerDidJump[ playerID ] <- false
 }
 
 
 bool function pDidJump( string playerID )
 {
-	if ( !( playerID in PlayerDidJump ) ) 
+	if ( !( playerID in file.PlayerDidJump ) ) 
 		return false
 	
-	if ( PlayerDidJump[ playerID ] == true ) 
+	if ( file.PlayerDidJump[ playerID ] == true ) 
 		return true 
 	
 	return false
@@ -4411,7 +4393,7 @@ int function GetGlides( entity player )
     int index = GetPlayerMetricsIndex( player )
 	
     if ( index != -1 ) 
-        return PlayerMetricsArray[ index ].SuperglideTimestamps.len();
+        return file.PlayerMetricsArray[ index ].SuperglideTimestamps.len();
 	
     return 0
 }
@@ -4686,8 +4668,8 @@ void function PlayerDisconnectedCallback( entity player )
 	array<int> uniqueIDs = ArrayUniqueInt( idsToDelete )
 	foreach( id in uniqueIDs ) 
 	{
-		if( id in allDamageEventsMap )
-			delete allDamageEventsMap[ id ]
+		if( id in file.allDamageEventsMap )
+			delete file.allDamageEventsMap[ id ]
 	}
 		
     string reason = "Disconnection"
@@ -4706,7 +4688,7 @@ void function PIN_SetGameStartTime()
 }
 
 //make sure round_end isn't started from multiple sources in codebase at same time.
-bool process_end_round_complete = true; 
+bool process_end_round_complete = true
 
 void function PIN_RoundEnd( int roundnum )
 {	
@@ -4809,6 +4791,41 @@ void function __UpdateMetricsNow()
 	__UpdateLiveStats_internal( Tracker_BuildAllPlayerMetrics( true ) )
 }
 
+const float MIN_INTERVAL_BACKEND_UPDATES = 45.0
+void function __UpdateMetricsAtInterval( float updateInterval )
+{
+	mAssert( IsNewThread(), "Function %s should have been threaded off", FUNC_NAME() )
+	mAssert( file.bLiveMetricsOnlyForNonCombatMode, "Method only valid in non combat modes. Enable with Tracker_RegisterTrackingAsNonCombatMode( true )" )
+	mAssert( updateInterval >= MIN_INTERVAL_BACKEND_UPDATES, "Cannot update stats sooner than every %.0f seconds", MIN_INTERVAL_BACKEND_UPDATES )
+	
+	OnThreadEnd
+	(
+		void function()
+		{
+			sqprint( "UpdateMetricsAtInterval Shutting down..." )
+		}
+	)
+	
+	svGlobal.levelEnt.EndSignal( "GameEnd" )
+	
+	for( ; ; )
+	{
+		wait updateInterval
+		__UpdateLiveStats_internal( Tracker_BuildAllPlayerMetrics( true ) )
+		__DestroyStats()
+	}
+}
+
+void function Tracker_UpdateAtInterval( float updateInterval )
+{
+	mAssert( !file.bUpdateIntervalThreadRunning, "%s was already running", FUNC_NAME() )
+	mAssert( file.bLiveMetricsOnlyForNonCombatMode, "Method only valid in non combat modes. Enable with Tracker_RegisterTrackingAsNonCombatMode( true )" )
+	mAssert( updateInterval >= MIN_INTERVAL_BACKEND_UPDATES, "Cannot update stats sooner than every %d seconds", MIN_INTERVAL_BACKEND_UPDATES )
+	
+	file.bUpdateIntervalThreadRunning = true 
+	thread __UpdateMetricsAtInterval( updateInterval )
+}
+
 void function PIN_GameEnd()
 {	
 	if ( process_end_round_complete == true )
@@ -4846,9 +4863,7 @@ void function PIN_AddPlayer( entity player )
 	}
 	
 	if( file.restricted_server )
-	{	
 		thread CheckForPlayerAccess( player )
-	}
 	
 	if( file.bTrackerEnabled && TrackerIsLogging__internal() && IsValid( player ) )
 	{	
@@ -5062,7 +5077,7 @@ string function Tracker_WinnerByKillsAndDamage()
     int winner_kills
     string winner_oid
 
-    foreach ( player in PlayerMetricsArray ) 
+    foreach ( player in file.PlayerMetricsArray ) 
 	{
         int kills = player.kills
         float damage = player.damage
@@ -5433,7 +5448,6 @@ bool function IsClientCommandAdminEnabled()
 #else
 		string function TrackerGetSetting__internal( string key ){ return "" }
 		void function TrackerReloadConfig__internal(){}
-		
 		void function InitializeTrackerLogThread__internal(){}
 		void function TrackerLogEvent__internal( string data, bool encrypt ){}
 		string function TrackerMatchID__internal(){ return "" }
@@ -5491,7 +5505,7 @@ string function Tracker_FetchPlayerData( string UID, string setting ){ return ""
 void function Tracker_SavePlayerData( string UID, string setting, ... ){}
 void function SavePlayerData( entity player, string setting, ... ){}
 bool function Tracker_StatExists( string stat ){ return false }
-string function TrackerGetSetting( string key ){ return "" }
+string function TrackerGetSettingString( string key ){ return "" }
 bool function TrackerGetSettingBool( string key ){ return false }
 int function TrackerGetSettingInt( string key ){ return 0 }
 float function TrackerGetSettingFloat( string key ){ return 0.0 }
@@ -5504,6 +5518,9 @@ void function Tracker_SetRestrictedServer( bool _ ){}
 SerializedData function Tracker_BuildAllPlayerMetrics( bool _ ){ return "" }
 int function Tracker_GetStartUnixTime(){ return file.launchStartUnixTime }
 void function Tracker_AddDestroyStatCallback( void functionref() callbackFunc ){}
+void function Tracker_SetShouldShip( bool _ ){}
+bool function Tracker_ShouldShip(){ return false }
+void function Tracker_UpdateAtInterval( float _ ){}
 
 void function PIN_Init()
 {

@@ -1236,7 +1236,7 @@ void function PathTT_PlayerBleedoutStateChanged( entity player, int newState )
 void function PlayBoxingRingKnockdownCommentary( entity killer )
 {
 	AssertIsNewThread()
-	wait 1.75
+	wait 1.75 //(mk) both functions below check for player validity in their early return.
 
 	if ( !ShouldPlayBoxingRingKnockdownCommentary( killer ) )
 		return
@@ -1319,7 +1319,10 @@ void function PathTT_Announcer_ProcessKnockedOrKilledPlayer( entity victim, enti
 #if SERVER
 void function PathTT_OnPlayerDamaged( entity player, var damageInfo )
 {
-	PrintDamageFlags( DamageInfo_GetCustomDamageType( damageInfo ) )
+	#if DEVELOPER
+		PrintDamageFlags( DamageInfo_GetCustomDamageType( damageInfo ) )
+	#endif
+	
 	if ( !IsBitFlagSet( DamageInfo_GetCustomDamageType( damageInfo ), DF_MELEE ) )
 	{
 		return

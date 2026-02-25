@@ -23,6 +23,7 @@ global function AddDeathCallback
 global function RemoveDeathCallback
 global function AddSoulDeathCallback
 global function AddCallback_OnPlayerRespawned
+global function AddCallback_OnPlayerRespawnedFinal
 global function AddCallback_OnPlayerKilled
 global function AddCallback_OnNPCKilled
 global function AddCallback_OnTitanDoomed
@@ -629,6 +630,12 @@ void function AddCallback_OnPlayerRespawned( void functionref( entity ) callback
 {
 	Assert( !svGlobal.onPlayerRespawnedCallbacks.contains( callbackFunc ), "Already added " + string( callbackFunc ) + " with AddCallback_OnPlayerRespawned" )
 	svGlobal.onPlayerRespawnedCallbacks.append( callbackFunc )
+}
+
+void function AddCallback_OnPlayerRespawnedFinal( void functionref( entity ) callbackFunc )
+{
+	mAssert( !svGlobal.onPlayerRespawnedFinalCallbacks.contains( callbackFunc ), "Already added " + string( callbackFunc ) + " with AddCallback_OnPlayerRespawned" )
+	svGlobal.onPlayerRespawnedFinalCallbacks.append( callbackFunc )
 }
 
 void function AddCallback_OnPlayerKilled( void functionref( entity victim, entity attacker, var damageInfo ) callbackFunc )

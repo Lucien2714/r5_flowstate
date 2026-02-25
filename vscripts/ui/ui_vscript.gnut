@@ -459,7 +459,7 @@ void function UpdateClientMenuOpenStateThread()
 
 void function AddUICallback_OnLevelInit( void functionref() callbackFunc )
 {
-	Assert( !(uiGlobal.onLevelInitCallbacks.contains( callbackFunc )), "Already added " + string( callbackFunc ) + " with AddUICallback_OnLevelInit" )
+	mAssert( !(uiGlobal.onLevelInitCallbacks.contains( callbackFunc )), "Already added " + string( callbackFunc ) + " with AddUICallback_OnLevelInit" )
 	uiGlobal.onLevelInitCallbacks.append( callbackFunc )
 }
 

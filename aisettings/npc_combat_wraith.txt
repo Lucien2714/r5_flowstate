@@ -141,8 +141,9 @@ npc_combat_wraith
 	MeleeChargeDamageMaxHeavyArmor	25
 	MeleeChargeDamageRadius			25
 	MeleeChargeRange				135
-	meleeChargeInterval				1
+	meleeChargeInterval			0
 	MeleeChargeEnemyArmorType		any
+	meleeInterval				0
 
 	//meleeImpactEffectTable		"melee_spectre"
 

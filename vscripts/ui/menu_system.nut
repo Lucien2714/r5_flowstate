@@ -60,6 +60,7 @@ struct
 	table<var, ButtonData > CoachingStartAgain
 	table<var, ButtonData > CoachingStop
 	table<var, ButtonData > LegendSelect
+	table<var, ButtonData > RealisticModeSpectate
 	
 	InputDef& qaFooter
 	
@@ -211,6 +212,7 @@ void function InitSystemPanel( var panel )
 	file.CoachingStartAgain[ panel ] <- clone data
 	file.CoachingStop[ panel ] <- clone data
 	file.LegendSelect[ panel ] <- clone data
+	file.RealisticModeSpectate[ panel ] <- clone data
 	
 	file.ExitChallengeButtonData[ panel ].label = "#FS_FINISH_CHALLENGE"
 	file.ExitChallengeButtonData[ panel ].activateFunc = SignalExitChallenge
@@ -311,6 +313,9 @@ void function InitSystemPanel( var panel )
 	file.LegendSelect[ panel ].label = "#SELECT_LEGEND"
 	file.LegendSelect[ panel ].activateFunc = OpenSelectLegend
 	
+	file.RealisticModeSpectate[ panel ].label = "#DEATH_SCREEN_SPECTATE"
+	file.RealisticModeSpectate[ panel ].activateFunc = RealisticModeSpectate
+	
 	AddPanelEventHandler( panel, eUIEvent.PANEL_SHOW, SystemPanelShow )
 }
 
@@ -349,8 +354,11 @@ void function UpdateSystemPanel( var panel )
 
 		SetButtonData( panel, buttonIndex++, file.settingsButtonData[ panel ] )
 		
-		if( Playlist() == ePlaylists.fs_dm || Playlist() == ePlaylists.fs_realistic_ttv )
+		if( Playlist() == ePlaylists.fs_dm && Playlist() != ePlaylists.fs_realistic_ttv )
 			SetButtonData( panel, buttonIndex++, file.ToggleScoreboardFocus[ panel ] )
+		
+		if( Playlist() == ePlaylists.fs_realistic_ttv && GetCurrentPlaylistVarBool( "realistic_enable_spectate", true ) )
+			SetButtonData( panel, buttonIndex++, file.RealisticModeSpectate[ panel ] )
 
 		if( uiGlobal.is1v1GameType && Playlist() != ePlaylists.fs_1v1_coaching ) //initialized after level load
 		{
@@ -378,7 +386,7 @@ void function UpdateSystemPanel( var panel )
 			SetButtonData( panel, buttonIndex++, file.ToggleRest[ panel ] )
 		}
 		
-		if( uiGlobal.is1v1GameType && Playlist() != ePlaylists.fs_1v1_coaching || Playlist() == ePlaylists.fs_realistic_ttv )
+		if( IsValidModeForLegendSelectButton() )
 			SetButtonData( panel, buttonIndex++, file.LegendSelect[ panel ] )
 		
 		if( Flowstate_IsTrackerSupportedMode() && UIVarExists( "tracker_enabled" ) && GetUIVar( null, "tracker_enabled" ) )
@@ -616,6 +624,11 @@ void function RunSpectateCommand()
 	ClientCommand( "spectate" )
 }
 
+void function RealisticModeSpectate()
+{
+	ClientCommand( "realistic_mode_spectate" )
+}
+
 void function ShowScoreboard_System()
 {
 	ClientCommand( "scoreboard_toggle_focus" )
@@ -688,7 +701,10 @@ void function OpenChampionCard()
 
 void function OpenSelectLegend()
 {
-	RunClientScript( "OpenCharacterSelectAimTrainer", true )
+	if( IsDevGamemode() )
+		RunClientScript( "OpenCharacterSelectNewMenu", true )
+	else
+		RunClientScript( "OpenCharacterSelectAimTrainer", true )
 }
 
 void function ReturnToMain_OnActivate( var button )
@@ -810,5 +826,22 @@ bool function ShouldShowDevMenu()
 	return true
 }
 
-
-
+bool function IsValidModeForLegendSelectButton()
+{
+	if( uiGlobal.is1v1GameType && Playlist() != ePlaylists.fs_1v1_coaching )
+		return true 
+		
+	int currentPlayListEnumId = Playlist()
+	switch( currentPlayListEnumId )
+	{
+		case ePlaylists.fs_realistic_ttv:
+		//
+		
+		return true
+	}
+	
+	if( IsDevGamemode() )
+		return true 
+		
+	return false
+}

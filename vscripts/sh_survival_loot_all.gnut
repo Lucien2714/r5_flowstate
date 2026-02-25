@@ -312,7 +312,7 @@ void function SURVIVAL_Loot_All_InitShared()
 	{
 		SURVIVAL_Loot_RegFromDataTable( GetDataTable( $"datatable/survival_loot_sdk.rpak" ) )
 		
-		if (IsFlowstateActive())
+		if ( IsFlowstateActive() )
 			SURVIVAL_Loot_RegFromDataTable( GetDataTable( $"datatable/flowstate_all_new.rpak" ) )
 		
 		if( Gamemode() == eGamemodes.fs_snd )

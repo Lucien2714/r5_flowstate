@@ -197,6 +197,17 @@ struct FileStruct_LifetimeLevel
 }
 FileStruct_LifetimeLevel& fileLevel
 
+struct 
+{
+	#if UI
+		string selectedLegendGUID //(mk): persists between level loads.
+	#endif
+	
+	#if SERVER || UI
+		bool bSelectLegendFromLobbyEnabled
+	#endif
+
+} file 
 
 
 /////////////////////////
@@ -211,10 +222,12 @@ bool DEV_resendAllCacheData = false // for uiscript_reset
 #if UI
 void function ShLoadouts_VMInit()
 {
-	#if UI && DEVELOPER
+	#if DEVELOPER
 		if ( IsFullyConnected() )
 			DEV_resendAllCacheData = true
 	#endif
+	
+	AddUICallback_OnLevelInit( SendSelectedLegendToServer )
 }
 #endif
 
@@ -231,12 +244,18 @@ void function ShLoadouts_LevelInit_Begin()
 		if( GetCurrentPlaylistVarBool( "enable_loadouts_set", true ) )
 			AddClientCommandCallback( "loadouts_set", ClientCommand_loadouts_set )
 			
+		AddClientCommandCallbackVoid( "setSelectedLegend", ClientCommand_SetSelectedLegend )	
+		AddClientCommandCallback( "loadouts_reset_persistent", ClientCommand_loadouts_reset_persistent )
+		AddClientCommandCallback( "loadouts_devset", ClientCommand_loadouts_devset )
+			
 		#if DEVELOPER
-			AddClientCommandCallback( "loadouts_reset_persistent", ClientCommand_loadouts_reset_persistent )
-			AddClientCommandCallback( "loadouts_devset", ClientCommand_loadouts_devset )
 			AddCallback_GeneratePDef( GenerateLoadoutsPDef )
 			AddClientCommandCallback( "loadouts_dump", ClientCommand_loadouts_dump )
 		#endif
+	#endif
+	
+	#if SERVER || UI 
+		file.bSelectLegendFromLobbyEnabled = GetCurrentPlaylistVarBool( "select_legend_from_lobby_enabled", true )
 	#endif
 }
 
@@ -822,10 +841,36 @@ void function RequestSetItemFlavorLoadoutSlot( EHI playerEHI, LoadoutEntry entry
 		GetLocalClientPlayer().ClientCommand( commandString )
 	#elseif UI
 		ClientCommand( commandString ) //
+		SetUISelectedLegend( ItemFlavor_GetGUIDString( itemFlavor ) ) //(mk): Retail sets the players persistent var, in r5r, we save it to ui and send the request after connect via client command if server has it enabled and mode supports it.
 	#endif
 
-	printf( "loadout change request: %s = %s (%s)", entry.DEV_name, ItemFlavor_GetHumanReadableRef( itemFlavor ), ItemFlavor_GetGUIDString( itemFlavor ) )
+	#if DEVELOPER
+		printf( "loadout change request: %s = %s (%s)", entry.DEV_name, ItemFlavor_GetHumanReadableRef( itemFlavor ), ItemFlavor_GetGUIDString( itemFlavor ) )
+	#endif
 }
+
+#if UI 
+	void function SetUISelectedLegend( string legendGUID )
+	{
+		file.selectedLegendGUID = legendGUID
+	}
+	
+	string function GetUISelectedLegend()
+	{
+		return file.selectedLegendGUID
+	}
+	
+	void function SendSelectedLegendToServer()
+	{
+		if( !file.bSelectLegendFromLobbyEnabled )
+			return 
+			
+		string legendGUID = GetUISelectedLegend()
+
+		if( legendGUID != "" )
+			ClientCommand( format( "setSelectedLegend %s", legendGUID ) )
+	}
+#endif 
 
 void function RequestClearItemFlavorFavoritesSlot( EHI playerEHI, LoadoutEntry entry, int favIndex )
 {
@@ -839,9 +884,12 @@ void function RequestClearItemFlavorFavoritesSlot( EHI playerEHI, LoadoutEntry e
 		GetLocalClientPlayer().ClientCommand( commandString )
 	#elseif UI
 		ClientCommand( commandString )
+		SetUISelectedLegend( "" )
 	#endif
 
-	printf( "loadout favorites clear request: %d", favIndex )
+	#if DEVELOPER
+		printf( "loadout favorites clear request: %d", favIndex )
+	#endif
 }
 #endif
 
@@ -1036,11 +1084,76 @@ void function GenerateLoadoutsPDef()
 #endif
 
 
-#if SERVER
-void function UpgradePlayerPersistentData( entity player, int oldVersion, int newVersion )
-{
-	GetEHIScriptStruct( player ).shouldConsiderAsUpgrading = true
-}
+#if SERVER 
+	bool function IsModeValidForLegendSelectFromLobby()
+	{
+		if( !file.bSelectLegendFromLobbyEnabled )
+			return false
+		
+		switch( Playlist() )
+		{
+			case ePlaylists.survival_dev:
+			case ePlaylists.survival_firingrange:
+			case ePlaylists.dev_default:
+			case ePlaylists.fs_aimtrainer:		
+			
+			return true
+		}
+		
+		if( IsLobby() )
+			return true
+		
+		if( ShouldAutoSelectPreferredLegend() )
+			return true
+		
+		return false
+	}
+	
+	bool function ShouldAutoSelectPreferredLegend()
+	{
+		switch( Playlist() )
+		{
+			case ePlaylists.survival_solos:
+			case ePlaylists.survival_duos:
+			case ePlaylists.survival_trios:
+			case ePlaylists.survival:
+			case ePlaylists.SURVIVAL: 
+			case ePlaylists.winterexpress:
+			case ePlaylists.fs_scenarios:
+			
+			return true
+		}
+		
+		return false
+	}
+
+	void function ClientCommand_SetSelectedLegend( entity player, array<string> args )
+	{
+		if( !args.len() )
+			return
+		
+		if( !IsModeValidForLegendSelectFromLobby() )
+			return
+			
+		int characterAssetGUID = ConvertItemFlavorGUIDStringToGUID( args[ 0 ] )
+		if( !IsValidCharacterGUID( characterAssetGUID, player ) )
+			return
+			
+		if( ShouldAutoSelectPreferredLegend() )
+		{
+			player.p.preferredLegendGUID = characterAssetGUID
+		}
+		else //(mk): just set it.
+		{
+			ItemFlavor character = GetItemFlavorByGUID( characterAssetGUID )
+			CharacterSelect_AssignCharacter( ToEHI( player ), character )
+		}
+	}
+
+	void function UpgradePlayerPersistentData( entity player, int oldVersion, int newVersion )
+	{
+		GetEHIScriptStruct( player ).shouldConsiderAsUpgrading = true
+	}
 #endif
 
 

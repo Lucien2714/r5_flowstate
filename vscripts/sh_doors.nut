@@ -21,10 +21,12 @@ global function RemoveDoorFromManagedEntArray
 global function OpenDoor
 global function CloseDoor
 global function GetDoorType
+global function AddCallback_OnDoorInteraction
 #endif
 
 #if SERVER && DEVELOPER
 global function DEV_RestartAllDoorThinks
+global function DEV_GetCurrentDoor
 #endif
 
 global function CodeCallback_OnDoorInteraction
@@ -65,6 +67,7 @@ struct
 		table< entity, DoorData > rebuiltDoorToData
 		table< vector, vector > doorBaseAnglesByDoorLoc // base Angles referenced by location of door.
 		array<void functionref(entity,entity,vector,var)> callbacks_onCodeDoorBroken
+		array<void functionref(entity,entity,entity,bool)> onDoorInteractionCallbacks
 	#endif //SERVER
 
 	#if CLIENT
@@ -88,6 +91,9 @@ struct
 	float blockableDoorRegenStartDelay
 	float blockableDoorRegenDuration
 	
+	#if SERVER 
+		entity dev_currentDoor
+	#endif
 
 } file
 
@@ -577,6 +583,11 @@ array<entity> function GetAllPropDoors_BigOnes()
 }
 
 #if SERVER && DEVELOPER
+entity function DEV_GetCurrentDoor()
+{
+	return file.dev_currentDoor
+}
+
 void function DEV_RestartAllDoorThinks()
 {
 	foreach( entity door, int doorType in file.allDoors )
@@ -910,7 +921,7 @@ void function SurvivalDoorThink( entity door, int doorType )
 			door.SetUsePrompts( "", "" )
 
 		if ( door.e.isOpen )
-		{
+		{			
 			EmitSoundOnEntity( door, "Door_Sliding_Metal_Close" )
 			door.e.isOpen = false
 			GradeFlagsClear( door, eGradeFlags.IS_OPEN )
@@ -1193,19 +1204,36 @@ vector function GetBlockableDoorDesiredAngles( entity door, int goalNotch )
 
 
 #if SERVER
+const bool DEBUG_DOORS = false
 void function OnCodeDoorSpawned( entity door )
 {
+	#if DEVELOPER && DEBUG_DOORS
+		printt
+		( 
+			"DOORDBG:",
+			"ent=", door,
+			"class=", door.GetClassName(),
+			"netclass=", door.GetNetworkedClassName(),
+			"scriptname=", door.GetScriptName(),
+			"targetname=", door.GetTargetName(),
+			"model=", string( door.GetModelName() ),
+			"origin=", door.GetOrigin()
+		)
+	#endif 
+
 	if( isScenariosMode() && door.GetScriptName() != "flowstate_door_realms" )
 	{
 		AddToScriptManagedEntArray( file.propDoorArrayIndex, door )
 		return
 	}
+	
 	door.SetMaxHealth( file.blockableDoorHealth )
 	door.SetHealth( door.GetMaxHealth() )
 	door.SetTakeDamageType( DAMAGE_YES )
 	door.SetDamageNotifications( true )
 	
 	door.EnableAttackableByAI( AI_PRIORITY_NO_THREAT, 0, AI_AP_FLAG_NONE ) 
+	door.SetIsValidAIMeleeTarget( true )
 	door.SetTouchTriggers( true )
 	
 	AddEntityCallback_OnPostDamaged( door, BlockableDoor_OnDamage )
@@ -1220,24 +1248,30 @@ void function OnCodeDoorSpawned( entity door )
 void function OnCodeDoorUsed( entity door, entity player, int useInputFlags )
 {
 	#if MP
-	TrackingVision_CreatePOI( eTrackingVisionNetworkedPOITypes.DOOR_USE, door, door.GetWorldSpaceCenter(), player.GetTeam(), player )
+		TrackingVision_CreatePOI( eTrackingVisionNetworkedPOITypes.DOOR_USE, door, door.GetWorldSpaceCenter(), player.GetTeam(), player )
 	#endif
 }
 
 void function BlockableDoorThink( entity door )
 {
 	door.EndSignal( "OnDestroy" )
+	
 	#if DEVELOPER
 		door.EndSignal( "HaltDoorThink" )
 	#endif
-	OnThreadEnd( function() : ( door ) {
-		if ( IsValid( door ) )
+	
+	OnThreadEnd
+	( 	
+		void function() : ( door ) 
 		{
-			door.SetAngles( door.e.spawnAngles )
-			RemoveEntityCallback_OnPostDamaged( door, BlockableDoor_OnDamage )
-			ClearCallback_CanUseEntityCallback( door )
-		}
-	} )
+			if ( IsValid( door ) )
+			{
+				door.SetAngles( door.e.spawnAngles )
+				RemoveEntityCallback_OnPostDamaged( door, BlockableDoor_OnDamage )
+				ClearCallback_CanUseEntityCallback( door )
+			}
+		} 
+	)
 
 	door.SetPusher( true )
 
@@ -1250,6 +1284,8 @@ void function BlockableDoorThink( entity door )
 	//door.SetUsableFOVByDegrees( 90.0 )
 	AddEntityCallback_OnPostDamaged( door, BlockableDoor_OnDamage )
 	SetObjectCanBeMeleed( door, true )
+	door.EnableAttackableByAI( AI_PRIORITY_NO_THREAT, 0, AI_AP_FLAG_NONE ) 
+	door.SetIsValidAIMeleeTarget( true )
 	SetVisibleEntitiesInConeQueriableEnabled( door, true )
 
 	door.AllowMantle()
@@ -1726,9 +1762,12 @@ void function BlockableDoor_OnDamage( entity door, var damageInfo )
 	float damageInflicted = DamageInfo_GetDamage( damageInfo )
 	//entity weapon      = DamageInfo_GetWeapon( damageInfo ) // This returns null for melee. See R5DEV-28611.
 	entity weapon         = null
-	if ( IsValid( attacker ) && attacker.IsPlayer() )
-		weapon = attacker.GetActiveWeapon( eActiveInventorySlot.mainHand )
-
+	if ( IsValid( attacker ) )
+	{
+		if( attacker.IsPlayer() || ( attacker.IsNPC() && attacker.GetClassName() == "npc_dummie" ) )	
+			weapon = attacker.GetActiveWeapon( eActiveInventorySlot.mainHand )
+	}
+		
 	if ( file.blockableDoorHurtBySpecialKick && IsValid( weapon ) && weapon.HasMod( "proto_door_kick" ) )
 	{
 		int guaranteedKickCount = file.blockableDoorGuaranteedKickKillCount
@@ -2297,11 +2336,26 @@ void function CodeCallback_OnDoorInteraction( entity door, entity user, entity o
 	{
 		string actionName = opening ? "door_open" : "door_close"
 		PIN_Interact( user, actionName )
+		
+		foreach( callbackFunc in file.onDoorInteractionCallbacks )
+			callbackFunc( door, user, oppositeDoor, opening )
+		
+		#if DEVELOPER 
+			if( user.IsPlayer() )
+				file.dev_currentDoor = door
+		#endif 
 	}
 	#endif
 }
 
 #if SERVER
+
+void function AddCallback_OnDoorInteraction( void functionref( entity, entity, entity, bool ) callbackFunc )
+{
+	mAssert( !file.onDoorInteractionCallbacks.contains( callbackFunc ), "Tried to add callback %s with %s but it was already added", string( callbackFunc ), FUNC_NAME() )
+	file.onDoorInteractionCallbacks.append( callbackFunc )
+}
+
 void function OpenDoor( entity door, entity player )
 {
 	if ( IsCodeDoor( door ) )

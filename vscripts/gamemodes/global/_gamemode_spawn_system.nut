@@ -455,7 +455,7 @@ global function SpawnSystem_ReturnAllSpawnLocationsFromDatatable	 // ( string da
 					[" script DEV_GetSpawn( int index )"] = "Returns LocPair object for given spawn. Indexed into with .origin and .angles such as script printt( DEV_GetSpawn(0).origin )",
 					[" script DEV_ShowCenter( int set )"] = "Shows the calculated center of a set that would be calculated automatically in a game mode based on teams per spawns grouping (teamsCount).",
 					[" script DEV_CheckSpawns( vector mins = ZERO_VECTOR, vector maxs = ZERO_VECTOR )"] = "Manually check all current configured spawns for player specified hull collision. Defaults to HULL_HUMAN if not provided.",
-					[" script DEV_CycleAll( float delay = 2.0 )"] = "Teleport's all players in server through each spawn one at a time until complete or called with <= 0  -- DEV_CycleAll( 0 ) to stop",
+					[" script DEV_CycleAll( float delay = 2.0, int startIdx = 0 )"] = "Teleport's all players in server through each spawn one at a time until complete or called with <= 0  -- DEV_CycleAll( 0 ) to stop.",
 					[" script DEV_GetSpawnInfo( int index )"] = "Returns the string for the spawns info metadata",
 					[" script DEV_EditSpawn( int index, vector ornull origin = null, vector ornull angles = null, string info = \"\" )"] = "Manually modify a spawn's data. Uses current for omitted params",
 					[" script DEV_PrintSpawn( int index = -1 )"] = "Print a spawns coordinates by index",
@@ -607,9 +607,9 @@ array<SpawnData> function SpawnSystem_ReturnAllSpawnLocations( int eMap = -1, ta
 		options = settings.spawnOptions
 		
 		#if DEVELOPER
-			Warning( "Options were not valid in %s()", FUNC_NAME() )
+			printf( "[SpawnSystem] Options were not valid/set in %s()", FUNC_NAME() )
 			foreach( setting, value in options )
-				printt( "[SpawnSystem] Spawn setting:", setting, " Value:", value )
+				printt( "[SpawnSystem] Setting Spawn setting:", setting, " Value:", value )
 		#endif
 	}
 		
@@ -4610,24 +4610,36 @@ void function DEV_CheckSpawns( vector mins = ZERO_VECTOR, vector maxs = ZERO_VEC
 	printm( invalidInfo )
 }
 
-void function DEV_CycleAll( float delay = 2.0 )
+void function DEV_CycleAll( float delay = 2.0, int startIdx = 0 )
 {
-	if( !GetSpawns().len() )
-	{
-		string none = "No spawns to cycle."
-		printl( none ); printm( none )
-	}
-
 	if( delay <= 0 )
 	{
 		file.dummyEnt.Signal( "EndCycleAllSpawns" )
 		return
 	}
+
+	int spawnsLen = GetSpawns().len()	
 	
-	thread __CycleSpawns( delay )
+	if( spawnsLen == 0 )
+	{
+		string none = "No spawns to cycle."
+		printl( none ); printm( none )
+		
+		return
+	}
+	
+	if( startIdx >= spawnsLen )
+	{
+		string cannot = format( "Cannot start at index %d, it does not exist", startIdx )
+		printl( cannot ); printm( cannot )
+		
+		return
+	}
+	
+	thread __CycleSpawns( delay, startIdx )
 }
 
-void function __CycleSpawns( float delay = 2.0 )
+void function __CycleSpawns( float delay = 2.0, int startIdx = 0 )
 {
 	file.dummyEnt.Signal( "EndCycleAllSpawns" )
 	file.dummyEnt.EndSignal( "EndCycleAllSpawns" )
@@ -4641,7 +4653,7 @@ void function __CycleSpawns( float delay = 2.0 )
 	
 	array<LocPair> spawns = GetSpawns()
 	int spawnsLen = spawns.len() - 1
-	for( int i = 0; i < spawnsLen; i++ )
+	for( int i = startIdx; i < spawnsLen; i++ )
 	{
 		foreach( player in GetPlayerArray() )
 		{
@@ -4653,10 +4665,16 @@ void function __CycleSpawns( float delay = 2.0 )
 	}
 }
 
-void function DEV_ReloadSpawnPak()
+void function DEV_ReloadSpawnPak( string pak = "" )
 {
-	UnloadPak( CORE_RPAK_NAME )
-	LoadPak( CORE_RPAK_NAME )
+	if( pak == "" )
+		pak = CORE_RPAK_NAME
+
+	string printMsg = format( "Reloading spawn pak \"%s\"", pak )
+	printl( printMsg ); printm( printMsg );
+	
+	UnloadPak( pak )
+	LoadPak( pak )
 }
 
 #endif //DEVELOPER

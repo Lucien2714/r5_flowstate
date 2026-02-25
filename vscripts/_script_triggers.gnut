@@ -360,7 +360,6 @@ void function ScriptTriggerPlayerDisconnectThink_Deprecated( entity triggerEnt, 
 
 array<entity> function GetAllEntitiesInTrigger_Deprecated( entity trigger )
 {
-
 	if ( HasForceUseCodeTriggers() )
 	{
 		array<entity> ents = trigger.GetTouchingEntities()

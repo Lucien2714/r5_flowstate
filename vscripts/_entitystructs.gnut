@@ -933,7 +933,8 @@ global struct ServerPlayerStruct
 	bool bTextmute 				= false	
 	
 	table< string, float > rateLimitTable = { DEFAULT_RATE_KEY = 0.0 }
-	
+	int realisticMode_bot_kills
+	int preferredLegendGUID = -1
 	////////////////////////////////////////////////////////////////
 
 
@@ -1253,6 +1254,9 @@ global struct ServerPlayerStruct
 	int submitCringeCount
 	int cringedCount
 	array< CringeReport > cringeDataReports //todo deprecate..
+	
+	//rankup
+	bool bHasRankupTpHint
 }
 
 global struct ChallengeScore
@@ -1377,6 +1381,8 @@ global struct ServerAIStruct
 	int  aiPriority = -1
 	int  skitId = -1
 	int  npcType = -1    // eNPC.*
+	
+	bool bIsInDoorFight
 }
 
 

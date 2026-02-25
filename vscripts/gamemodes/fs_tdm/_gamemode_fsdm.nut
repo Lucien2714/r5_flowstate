@@ -5101,7 +5101,7 @@ bool function ClientCommand_SpectateEnemies(entity player, array<string> args)
 	if( !IsValid(player) )
 		return false
 
-	if( flowstateSettings.flowstate_1v1mode )
+	if( flowstateSettings.flowstate_1v1mode || Playlist() == ePlaylists.fs_realistic_ttv )
 		return false
 	
     if ( GetGameState() == eGameState.MapVoting || GetGameState() == eGameState.WaitingForPlayers || file.tdmState == eTDMState.NEXT_ROUND_NOW || !player.p.isSpectating && !IsAlive( player ) )

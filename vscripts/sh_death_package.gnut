@@ -208,7 +208,9 @@ bool function TryHeadshotDeathFX( entity victim )
 
 		victim.SetBodygroupModelByIndex( bodyGroupIndex, stateIndex )
 
-		printt( "Victim: " + victim + " BodyGroup: " + bodyGroupIndex + " StateIndex: " +  stateIndex )
+		#if DEVELOPER
+			printt( "Victim: " + victim + " BodyGroup: " + bodyGroupIndex + " StateIndex: " +  stateIndex )
+		#endif
 	}
 
 	int tagID = victim.LookupAttachment( "HEADSHOT" )

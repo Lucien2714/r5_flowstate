@@ -417,7 +417,7 @@ asset function GetModeEmblemImage( string playlistName )
 		break
 		
 		case "fs_realistic_ttv":
-		emblemImage = $""
+		emblemImage = $"rui/flowstatecustom/dm"
 		break
 		
 		case "fs_haloMod_survival":

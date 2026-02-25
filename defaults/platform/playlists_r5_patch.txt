@@ -507,6 +507,7 @@ playlists
 				///////////////////////////////////////////////////////////////////////////////////
 				
 				disable_message_sounds							0 // optionally disable default message banner sounds on client by setting to 1
+				survival_disabled_loot							"highcal_mag_l3" //(mk): temporary disabled for season 6
 			}
 			maps
 			{
@@ -1494,6 +1495,7 @@ playlists
 
 				blacklisted_weapon_0							"mp_weapon_energy_ar"
 				blacklisted_weapon_1							"mp_weapon_esaw"
+				blacklisted_weapon_2							"mp_weapon_sniper" //is given in lootspawns
 
 				whitelisted_weapon_0 							"mp_weapon_mastiff"
 				//whitelisted_weapon_1 							""				
@@ -1554,16 +1556,32 @@ playlists
 				
 				show_short_champion_screen						1
 				
-				random_dummy_spawn								0 //bool, enables ai bots spawning randomly to kill someone
+				random_dummy_spawn								1 	//bool, enables ai bots spawning randomly to kill someone
 				random_dummy_spawn_mintime						100
 				random_dummy_spawn_maxtime						250
 				allow_legend_select								0
-				realistic_mode_allow_legend_abilities			0 
-				realistic_ttv_ai_training_feature				1 //can be started/stopped with client command from an admin:  training 1/0/true/false
+				realistic_mode_allow_legend_abilities			0 	//proto
+				realistic_ttv_ai_training_feature				1 	//can be started/stopped with client command from an admin:  training 1/0/true/false
 				realistic_ttv_ai_training_mode_auto_start		0
 				realistic_ttv_max_alive_bots					2
-			
+				blockable_door_can_be_hurt_by_melee				1 // required for ai logic
+				
 				dissolve_drops_time								15
+				realistic_mode_give_heirloom					1
+				realistic_max_players_for_bots					3 	//when player count goes above this number, will disable patrol bots if realistic_ttv_ai_training_feature is enabled
+				realistic_min_players_for_bots					1
+			
+				realistic_enable_spectate						1	
+				realistic_player_timeout_enabled				1 	//allows admins to timeout players for this mode
+				
+				realistic_ground_loot							1 	// enables tierd ground loot custom spawns
+				realistic_ground_loot_spawn_min					10 	// minimum time between spawns 
+				realistic_ground_loot_spawn_max					25 	// maximum time between spawns
+				realistic_ground_loot_num_items_at_once			8
+				
+				realistic_air_drops								1 	//enables loot air drops
+				realistic_airdrop_spawn_min						60
+				realistic_airdrop_spawn_max						180
 			}
 			gamemodes { fs_dm { maps {
 				mp_rr_desertlands_64k_x_64k						1
@@ -2123,7 +2141,7 @@ playlists
 				//game continuity 
 				flowstateAutoreloadPrimary 						1
 				flowstateAutoreloadSecondary 					1
-				flowstateKillshotEnabled 						1	//enables the killshot sound when killing
+				flowstateKillshotEnabled 						0	//enables the killshot sound when killing
 				
 				//extrashields
 				flowstateExtrashieldsEnabled 					0
@@ -2378,7 +2396,7 @@ playlists
 				
 				
 				
-				default_shield_hp				  				125
+				default_shield_hp				  				100
 				survival_shields				   				1
 				skydive_ziplines_enabled		   				1
 				ground_loot_enable 				   				0
@@ -2537,7 +2555,7 @@ playlists
 				max_players										120
 				min_players										0
 				
-				default_shield_hp				  				125
+				default_shield_hp				  				100
 				survival_shields				   				1
 				skydive_ziplines_enabled		   				1
 				ground_loot_enable 				   				0
@@ -2674,7 +2692,7 @@ playlists
 				max_players										120
 				min_players										0
 				
-				default_shield_hp				  				125
+				default_shield_hp				  				100
 				survival_shields				   				1
 				skydive_ziplines_enabled		   				1
 				ground_loot_enable 				   				0
@@ -3227,6 +3245,10 @@ playlists
 				
 				// 0 disables players colliding with each other.
 				player_collision_enabled						0 
+							
+				// don't give basic survival items
+				give_basic_survival_items 						0
+				
 			}
 			gamemodes { survival { maps {
 				mp_rr_desertlands_64k_x_64k						1
@@ -4102,7 +4124,7 @@ playlists
 				"MOTD_TEXT" "本服务器由L2714搭建，KOOK语音41289816 交流群732124612\n游玩本服务器默认同意以下游玩规则：\n1.1v1时不准逃跑、躲藏、利用掩体（包括换弹、peek、卡头皮位等）\n2.请友善对待他人，善待萌新\n3.引战者（输入设备、红绿大战等）直接踢\n4.作弊永封\n违反以上任意一条规则将会收到相应处罚，申诉请加群。\n致谢名单：\n感谢坩埚钳特大号的赞助，改手柄就找b站坩埚钳特大号" //set your servers message of the day. 1000 char max.  Use \n for newline.
 				"MOTD_TEXT_EXTENDED" "" // appends to first, 1000 char max.
 			
-				"BETA_BUILD_WATERMARK" "R5Reloaded - v2.6.22"
+				"BETA_BUILD_WATERMARK" "R5Reloaded - v2.6.31"
 
 				//////////////////////////////////////////////////
 				// TEMP TOKENS (remove before release shipping )//

@@ -112,10 +112,10 @@ void function rankupmap_init()
 	Ping_SetCanPingCallback( CanPing )
 	
 	file.bCollisionEnabled = GetCurrentPlaylistVarBool( "player_collision_enabled", false )
-	AddCallback_OnPlayerRespawned( OnSpawned )
+	AddCallback_OnPlayerRespawnedFinal( OnSpawnedFinal )
 }
 
-void function OnSpawned( entity player )
+void function OnSpawnedFinal( entity player )
 {
 	string uid = player.GetPlatformUID()
 	
@@ -124,12 +124,20 @@ void function OnSpawned( entity player )
 		if( file.current_cp[ uid ] != ZERO_VECTOR )
 		{
 			__EnablePracticeMode( player, uid, false )
-			LocalMsg( player, "#FS_NULL", "#FS_NULL", eMsgUI.NOTIFICATION, max( 9999, GetConVarFloat( "host_autoReloadRate" ) ), "Active TP", "You have an active tp stored." )
+			SetRankupTpHint( player, true )
 		}
 	}
 	
 	if( !file.bCollisionEnabled )
-		DisablePlayerCollision( player ) 
+		DisablePlayerCollision( player )
+		
+	if( !PlayerHasPassive( player, ePassives.PAS_CRYPTO ) )
+		GivePassive( player, ePassives.PAS_CRYPTO )
+		
+	player.TakeOffhandWeapon( OFFHAND_TACTICAL )
+	player.GiveOffhandWeapon( "mp_ability_crypto_drone", OFFHAND_TACTICAL )
+		
+	GiveMelee( player )
 }
 
 bool function CanPing( entity player )
@@ -161,7 +169,7 @@ void function rankupmap_player_setup( entity user )
 					wait 3
 					
 					__EnablePracticeMode( user, uid, false )
-					LocalMsg( user, "#FS_NULL", "#FS_NULL", eMsgUI.NOTIFICATION, 10, "Active TP", "You have an active tp stored." )
+					SetRankupTpHint( user, true )
 				}
 			)()
 		}
@@ -176,6 +184,22 @@ void function rankupmap_player_setup( entity user )
 	EmitSoundOnEntityOnlyToPlayer( user, user, FIRINGRANGE_BUTTON_SOUND )
 	TeleportFRPlayer( user, < -743, 24760.42, 54327.38 > , < 3, 90, -0.04 > )
 	user.SetPersistentVar( "gen", 0 )
+}
+
+void function SetRankupTpHint( entity player, bool setting )
+{
+	if( setting )
+	{
+		LocalMsg( player, "#FS_NULL", "#FS_NULL", eMsgUI.NOTIFICATION, max( 9999, GetConVarFloat( "host_autoReloadRate" ) ), "Active TP", "You have an active tp stored." )
+		player.p.bHasRankupTpHint = true
+	}
+	else 
+	{
+		if( player.p.bHasRankupTpHint )
+			LocalMsg( player, "#FS_NULL", "#FS_NULL", eMsgUI.NOTIFICATION, 0.1 )
+			
+		player.p.bHasRankupTpHint = false
+	}
 }
 
 // Practice mode
@@ -233,7 +257,7 @@ void function __DisablePracticeMode( entity user, string uid )
 	if( !user.HasPassive( ePassives.PAS_PILOT_BLOOD ) )
 		GivePassive( user, ePassives.PAS_PILOT_BLOOD )
 		
-	LocalMsg( user, "#FS_NULL", "#FS_NULL", eMsgUI.NOTIFICATION, 0.1 )
+	SetRankupTpHint( user, false )
 }
 
 bool function ClientCommand_TeleportToCheckpoint( entity user, array < string > args ) 
@@ -250,7 +274,7 @@ bool function ClientCommand_TeleportToCheckpoint( entity user, array < string > 
 	user.SetAngles( file.current_angles[ uid ] )
 	user.KnockBack( <0, 0, 0.1>, 0.1 )
 	
-	LocalMsg( user, "#FS_NULL", "#FS_NULL", eMsgUI.NOTIFICATION, 0.1 )
+	SetRankupTpHint( user, false )
 	return true
 }
 
@@ -3662,24 +3686,25 @@ thread function() : ( ent ) {
     }
     })
     DispatchSpawn( trigger )
-    trigger = MapEditor_CreateTrigger( < -756.4, 24828.1, 54274.9 >, < 0, 0, 0 >, 100, 50, false )
-    trigger.SetEnterCallback( void function( entity trigger, entity ent )
+    trigger = MapEditor_CreateTrigger( < -756.4, 24828.1, 54274.9 >, < 0, 0, 0 >, 100, 50, false )   
+	trigger.SetEnterCallback( void function( entity trigger, entity ent )
     {
-        if (IsValid(ent)) 
-    {
-        if (ent.IsPlayer() && ent.GetPhysics() != MOVETYPE_NOCLIP) 
-        {
-        	array<ItemFlavor> characters = GetAllCharacters()
-        	CharacterSelect_AssignCharacter(ToEHI(ent), characters[10])
-          //TakeAllWeapons( ent )
-          //TakeAllPassives( ent )
-          ent.TakeOffhandWeapon(OFFHAND_ULTIMATE)
-          //ent.GiveOffhandWeapon( "mp_ability_crypto_drone", OFFHAND_TACTICAL)
+        if ( IsValid( ent ) ) 
+		{
+			if ( ent.IsPlayer() && ent.GetPhysics() != MOVETYPE_NOCLIP ) 
+			{
+				array<ItemFlavor> characters = GetAllCharacters()
+				CharacterSelect_AssignCharacter( ToEHI( ent ), characters[ 10 ], true, false ) //(mk): not passing arg 4 as false was taking crypto passive causing recall to not work. If this becomes an issue, remove the false, and just give the passive for crypto manually after.
+			  
+			  //TakeAllWeapons( ent )
+			  //TakeAllPassives( ent )
+			  ent.TakeOffhandWeapon( OFFHAND_ULTIMATE )
+			  //ent.GiveOffhandWeapon( "mp_ability_crypto_drone", OFFHAND_TACTICAL)
 
-          //if( !ent.HasPassive( ePassives.PAS_PILOT_BLOOD ) )
-            //GivePassive(ent, ePassives.PAS_PILOT_BLOOD)
-        }
-    }
+			  //if( !ent.HasPassive( ePassives.PAS_PILOT_BLOOD ) )
+				//GivePassive(ent, ePassives.PAS_PILOT_BLOOD)
+			}
+		}
     })
     DispatchSpawn( trigger )
     trigger = MapEditor_CreateTrigger( < -662.0441, -49783.43, 40617 >, < 0, 0, 0 >, 9000, 100, false )

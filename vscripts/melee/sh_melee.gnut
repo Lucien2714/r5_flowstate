@@ -350,11 +350,14 @@ bool function IsValidMeleeAttackTarget( entity attacker, entity inputWeaponOrNul
 entity function GetMeleeAttackLungeTarget( entity attacker, entity meleeAttackWeapon )
 {
 	entity lungeTarget
-	try{
+	try
+	{
 		lungeTarget = PlayerMelee_LungeConeTrace( attacker, meleeAttackWeapon, SHARED_CB_IS_VALID_MELEE_ATTACK_TARGET )
-	}catch(e420)
+	}
+	catch( e420 )
 	{
 	}
+	
 	return lungeTarget
 }
 #endif
@@ -416,7 +419,7 @@ bool function CodeCallback_IsValidMeleeAttackTarget( entity attacker, entity tar
 void function CodeCallback_OnMeleePressed( entity attacker, entity meleeInputWeapon )
 {
 	#if SERVER
-	// Warning( "//NEW MELEE ATTACK// CodeCallback_OnMeleePressed" )
+		//Warning( "//NEW MELEE ATTACK// CodeCallback_OnMeleePressed" )
 	#endif
 	if( !IsValid( attacker ) || !IsValid( meleeInputWeapon ) )
 		return
@@ -446,21 +449,28 @@ void function CodeCallback_OnMeleePressed( entity attacker, entity meleeInputWea
 			attacker.PlayerMelee_EndAttack()
 			weaponx.Raise()
 			return
-		} else if ( TitanSword_Slam_TrySlam( attacker, weaponx ) )
+		} 
+		else if ( TitanSword_Slam_TrySlam( attacker, weaponx ) )
 		{
-		} else if ( TitanSword_Heavy_TryHeavyAttack( attacker, weaponx ) )
+		
+		} 
+		else if ( TitanSword_Heavy_TryHeavyAttack( attacker, weaponx ) )
 		{
 			TitanSword_TryMultiAttack( attacker, weaponx )
 		}
 
 		attacker.PlayerMelee_StartAttack( PLAYER_MELEE_STATE_HUMAN_KICK_ATTACK )
+		
 		#if SERVER
 			meleeAttackWeapon.EmitWeaponNpcSound_DontUpdateLastFiredTime( 200, 0.2 )
 		#endif
+		
 		attacker.SetSelectedOffhand( eActiveInventorySlot.mainHand, meleeAttackWeapon )
 		attacker.p.isSecondaryMeleeAttack = false
+		
 		return
-	}else if( IsValid( weaponx ) && weaponx.GetWeaponClassName() == "mp_weapon_titan_sword" && attacker.p.isSecondaryMeleeAttack )
+	}
+	else if( IsValid( weaponx ) && weaponx.GetWeaponClassName() == "mp_weapon_titan_sword" && attacker.p.isSecondaryMeleeAttack )
 	{
 		if( !weaponx.IsReadyToFire() )
 			return
@@ -469,7 +479,8 @@ void function CodeCallback_OnMeleePressed( entity attacker, entity meleeInputWea
 		if( TitanSword_Launcher_TryLauncher( attacker, weaponx ) )
 		{
 			shouldstartattack = true
-		} else
+		} 
+		else
 		{
 			//Light attack
 			weaponx.RemoveMod( "heavy_melee" )
@@ -484,40 +495,42 @@ void function CodeCallback_OnMeleePressed( entity attacker, entity meleeInputWea
 			return
 
 		attacker.PlayerMelee_StartAttack( PLAYER_MELEE_STATE_HUMAN_KICK_ATTACK )
+		
 		#if SERVER
 			meleeAttackWeapon.EmitWeaponNpcSound_DontUpdateLastFiredTime( 200, 0.2 )
 		#endif
+		
 		attacker.SetSelectedOffhand( eActiveInventorySlot.mainHand, meleeAttackWeapon )
 		attacker.p.isSecondaryMeleeAttack = false
 		return
 	}		
 
 	#if SERVER
-	if(GetCurrentPlaylistVarBool( "firingrange_aimtrainerbycolombia", false ))
+	if( GetCurrentPlaylistVarBool( "firingrange_aimtrainerbycolombia", false ) )
 	{
 		entity player = attacker
 		int basedamage = 30 //!FIXME
 		int ornull projectilespershot = 1 //!FIXME
 		int pellets = 1
-		if(projectilespershot != null)
+		if( projectilespershot != null )
 		{
-			pellets = expect int(projectilespershot)
-			player.p.totalPossibleDamage += (basedamage * pellets)
+			pellets = expect int( projectilespershot )
+			player.p.totalPossibleDamage += ( basedamage * pellets )
 		}
 		else 
 			player.p.totalPossibleDamage += basedamage
 		
 		//add 1 hit to total hits
-		player.p.straferTotalShots += (1*pellets)
+		player.p.straferTotalShots += ( 1*pellets )
 		
-		Remote_CallFunction_NonReplay(player, "ServerCallback_LiveStatsUIDamageViaWeaponAttack", basedamage, basedamage * pellets)
-		Remote_CallFunction_NonReplay(player, "ServerCallback_LiveStatsUIAccuracyViaTotalShots", pellets)
+		Remote_CallFunction_NonReplay( player, "ServerCallback_LiveStatsUIDamageViaWeaponAttack", basedamage, basedamage * pellets )
+		Remote_CallFunction_NonReplay( player, "ServerCallback_LiveStatsUIAccuracyViaTotalShots", pellets )
 	}
 	#endif
 
 	attacker.PlayerMelee_StartAttack( PLAYER_MELEE_STATE_HUMAN_KICK_ATTACK )
 
-	if(  IsValid( attacker.GetActiveWeapon( eActiveInventorySlot.mainHand ) ) )
+	if( IsValid( attacker.GetActiveWeapon( eActiveInventorySlot.mainHand ) ) )
 	{
 		if( attacker.GetActiveWeapon( eActiveInventorySlot.mainHand ).GetWeaponClassName() == "mp_weapon_energysword" && !meleeAttackWeapon.HasMod( "energysword" ) )
 		{
@@ -579,7 +592,8 @@ void function CodeCallback_OnMeleePressed( entity attacker, entity meleeInputWea
 				attacker.Lunge_SetSmoothTime( 0.7 )
 				attacker.Lunge_EnableFlying()
 			}
-		} else if( PlayerHasPassive( attacker, ePassives.PAS_SHOTGUN_KICK ) )
+		} 
+		else if( PlayerHasPassive( attacker, ePassives.PAS_SHOTGUN_KICK ) )
 		{
 			meleeAttackWeapon.AddMod( "proto_door_kick" )
 		}

@@ -5577,18 +5577,24 @@ void function SetRandomStagingPositionForPlayer( entity player )
 	player.SetAngles( randomSpawnPoint.GetAngles() )
 }
 
-array<entity> function ArrayEntSphere(vector origin, float radius) {
+array<entity> function ArrayEntSphere( vector origin, float radius ) 
+{
     array<entity> entities
     entity ent = Entities_FindInSphere( null, origin, radius )
 
-    for ( ;; )
+    for ( ; ; )
     {
         if ( ent == null )
-            break
+            break			
 		entities.append( ent )
-		printt(ent.GetTargetName())
-        ent = Entities_FindInSphere( ent, origin, radius)
+		
+		#if DEVELOPER && false
+			printt( ent.GetTargetName() )
+		#endif
+		
+        ent = Entities_FindInSphere( ent, origin, radius )
     }
+	
     return entities
 }
 
@@ -6120,4 +6126,34 @@ void function DisablePlayerCollision( entity player )
 void function EnablePlayerCollision( entity player )
 {
 	player.kv.contents = CONTENTS_BULLETCLIP | CONTENTS_MONSTERCLIP | CONTENTS_HITBOX | CONTENTS_BLOCKLOS | CONTENTS_PHYSICSCLIP | CONTENTS_PLAYERCLIP
+}
+
+bool function CountDamageSourceAsDeath( int damageSourceId )
+{
+	if( !Onboarding_GetNegateDespawnStats() )
+		return true
+
+	if( damageSourceId == eDamageSourceId.damagedef_despawn )
+		return false 
+		
+	return true
+}
+
+bool function HasWeaponInWeaponSlot( entity player, int slot )
+{
+	return IsValid( player.GetNormalWeapon( slot ) )
+}
+
+void function TakeWeaponBySlot( entity player, int slot )
+{
+	player.TakeNormalWeaponByIndexNow( slot )
+}
+
+void function GiveMelee( entity player )
+{
+	if( !HasWeaponInWeaponSlot( player, WEAPON_INVENTORY_SLOT_PRIMARY_2 ) )
+		player.GiveWeapon( "mp_weapon_melee_survival", WEAPON_INVENTORY_SLOT_PRIMARY_2, [] )
+		
+	player.TakeOffhandWeapon( OFFHAND_MELEE )
+	player.GiveOffhandWeapon( "melee_pilot_emptyhanded", OFFHAND_MELEE, [] )
 }

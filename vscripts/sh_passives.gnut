@@ -245,13 +245,13 @@ string function GetPassiveName( int enumIndex )
 
 void function GivePassive( entity player, int passive )
 {
-    if(!IsValid(player))
+    if( !IsValid( player ) )
         return
     
 	bool didHavePassive = player.HasPassive( passive )
 
 	#if DEVELOPER
-		// DumpStack()
+		//DumpStack()
 		printt( "[+] Give passive: ", passive, GetPassiveName( passive ) )
 	#endif
 		
@@ -269,6 +269,7 @@ void function TakePassive( entity player, int passive )
 	bool didHavePassive = player.HasPassive( passive )
 
 	#if DEVELOPER
+		//PrintCallStack()
 		printt( "[+] Take passive: ", passive, GetPassiveName( passive )  )
 	#endif
 		

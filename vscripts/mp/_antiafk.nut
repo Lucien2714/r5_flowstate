@@ -1,6 +1,5 @@
 global function Flowstate_Afk_Init
 global function Flowstate_InitAFKThreadForPlayer
-global function AfkThread_PlayerMoved
 
 struct 
 {
@@ -40,7 +39,7 @@ void function Flowstate_InitAFKThreadForPlayer( entity player )
 		
 	//(mk): these are needed for game logic that utilizs p.lastmoved 
 	AfkThread_AddPlayerCallbacks( player ) //readded mkos
-	AfkThread_PlayerMoved( player )
+	SetPlayerMoved( player )
 
 	if( !file.flowstate_afk_kick_enable || !file.enable_afk_thread ) // IsAdmin( player ) //(mk): removed admin check here so admins can still be afked-to-rest
 		return
@@ -122,7 +121,7 @@ void function CheckAfkKickThread(entity player)
 					{
 						if( Gamemode1v1_IsPlayerResting( player ) )
 						{
-							AfkThread_PlayerMoved( player )
+							SetPlayerMoved( player )
 							continue
 						}
 						
@@ -149,30 +148,30 @@ void function CheckAfkKickThread(entity player)
     }
 }
 
-void function AfkThread_PlayerMoved( entity player )
+void function SetPlayerMoved( entity player )
 {
     player.p.lastmoved = Time()
 }
 
 void function AfkThread_AddPlayerCallbacks( entity player )
 {
-	AddPlayerPressedForwardCallback( player, AfkThread_PlayerMoved, 1 )
-	AddPlayerPressedBackCallback( player, AfkThread_PlayerMoved, 1 )
-	AddPlayerPressedLeftCallback( player, AfkThread_PlayerMoved, 1 )
-	AddPlayerPressedRightCallback( player, AfkThread_PlayerMoved, 1 )
+	AddPlayerPressedForwardCallback( player, SetPlayerMoved, 1 )
+	AddPlayerPressedBackCallback( player, SetPlayerMoved, 1 )
+	AddPlayerPressedLeftCallback( player, SetPlayerMoved, 1 )
+	AddPlayerPressedRightCallback( player, SetPlayerMoved, 1 )
 	
 	
 	//disabled and reworked to above (fixed callback move inputs) -- mkos
 	
 	/*
-	AddButtonPressedPlayerInputCallback( player, IN_ATTACK, AfkThread_PlayerMoved )
-	AddButtonPressedPlayerInputCallback( player, IN_JUMP, AfkThread_PlayerMoved )
-	AddButtonPressedPlayerInputCallback( player, IN_FORWARD, AfkThread_PlayerMoved )
-	AddButtonPressedPlayerInputCallback( player, IN_BACK, AfkThread_PlayerMoved )
-	AddButtonPressedPlayerInputCallback( player, IN_USE, AfkThread_PlayerMoved )
-	AddButtonPressedPlayerInputCallback( player, IN_MOVELEFT, AfkThread_PlayerMoved )
-	AddButtonPressedPlayerInputCallback( player, IN_MOVERIGHT, AfkThread_PlayerMoved )
-	AddButtonPressedPlayerInputCallback( player, IN_LEFT, AfkThread_PlayerMoved )
-	AddButtonPressedPlayerInputCallback( player, IN_RIGHT, AfkThread_PlayerMoved )
+	AddButtonPressedPlayerInputCallback( player, IN_ATTACK, SetPlayerMoved )
+	AddButtonPressedPlayerInputCallback( player, IN_JUMP, SetPlayerMoved )
+	AddButtonPressedPlayerInputCallback( player, IN_FORWARD, SetPlayerMoved )
+	AddButtonPressedPlayerInputCallback( player, IN_BACK, SetPlayerMoved )
+	AddButtonPressedPlayerInputCallback( player, IN_USE, SetPlayerMoved )
+	AddButtonPressedPlayerInputCallback( player, IN_MOVELEFT, SetPlayerMoved )
+	AddButtonPressedPlayerInputCallback( player, IN_MOVERIGHT, SetPlayerMoved )
+	AddButtonPressedPlayerInputCallback( player, IN_LEFT, SetPlayerMoved )
+	AddButtonPressedPlayerInputCallback( player, IN_RIGHT, SetPlayerMoved )
 	*/
 }

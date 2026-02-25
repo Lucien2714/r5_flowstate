@@ -546,7 +546,7 @@ SettingsAssetGUID function ConvertItemFlavorGUIDStringToGUID( string guidString 
 	if ( guidString.slice( 0, 4 ).toupper() != "SAID" )
 		return 0
 
-	return int(guidString.slice( 4 ))
+	return int( guidString.slice( 4 ) )
 }
 
 

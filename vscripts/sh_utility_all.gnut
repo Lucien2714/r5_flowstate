@@ -2753,7 +2753,7 @@ asset function GetAssetFromString( string str )
 
 bool function IsDevGamemode()
 {
-	switch(GetCurrentPlaylistName())
+	switch( GetCurrentPlaylistName() )
 	{
 		case "survival_dev":
 		case "dev_default":

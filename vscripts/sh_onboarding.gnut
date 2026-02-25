@@ -60,6 +60,9 @@ global function SV_CL_Onboarding_Init
 	global function SetPlayerSettings
 	global function Flowstate_ApplyModifiedMovementToPlayer
 	
+	global function Onboarding_SetNegateDespawnStats
+	global function Onboarding_GetNegateDespawnStats
+	
 	#if DEVELOPER 
 		global function DEV_SetMovement
 	#endif
@@ -115,13 +118,15 @@ global bool script_bGiveskins = false
 
 struct
 {
-	void functionref(entity player ) ObserverThreadOverrideCallback = null
+	void functionref( entity player ) ObserverThreadOverrideCallback = null
 	int flowstate_modified_movement
 	
 	#if SERVER
 		bool use_r2_deathcam
 		bool bReserveAdminSlot
+		bool bGamemodeIgnoresDespawnOrSuicide
 	#endif
+	
 } file
 
 
@@ -168,6 +173,16 @@ void function SV_CL_Onboarding_Init()
 	
 	This part describes the onboarding sequences: threaded functions which control the onboarding.
 */
+
+void function Onboarding_SetNegateDespawnStats( bool setting )
+{
+	file.bGamemodeIgnoresDespawnOrSuicide = setting
+}
+
+bool function Onboarding_GetNegateDespawnStats()
+{
+	return file.bGamemodeIgnoresDespawnOrSuicide
+}
 
 void function Sequence_WaitingForPlayers()
 {
@@ -351,7 +366,7 @@ void function Sequence_PickLoadout()
 	thread Sequence_Prematch()
 }
 
-void function Flowstate_AssignUniqueCharacterForPlayer(entity player, bool lock)
+void function Flowstate_AssignUniqueCharacterForPlayer( entity player, bool lock )
 {
 	// Warning( "Flowstate_AssignUniqueCharacterForPlayer" )
 	// DumpStack()
@@ -388,11 +403,20 @@ void function Flowstate_AssignUniqueCharacterForPlayer(entity player, bool lock)
 	}
 
 	ItemFlavor initialCharacter
+	int preferredLegendGUID = player.p.preferredLegendGUID //(mk): only gets set from lobby selection after passing checks in: ShouldAutoSelectPreferredLegend 
 	
-	if( characters.len() == 0) //Shouldn't happen, but just in case. (Teams of more than 10 players probably)
+	if( characters.len() == 0 )//Shouldn't happen, but just in case. (Teams of more than 10 players probably)
+	{
 		initialCharacter = GetAllCharacters().getrandom()
+	}
+	else if( preferredLegendGUID != -1 && IsValidCharacterGUID( preferredLegendGUID, player ) )
+	{
+		initialCharacter = GetItemFlavorByGUID( preferredLegendGUID )
+	}
 	else
+	{
 		initialCharacter = characters.getrandom()
+	}
 	
 	player.SetPlayerNetInt( "characterSelectFocusIndex", ConvertItemFlavorToLoadoutSlotContentsIndex( Loadout_CharacterClass(), initialCharacter ) )
 	
@@ -510,7 +534,7 @@ void function TakeLoadoutRelatedWeapons( entity player )
 
 void function GiveLoadoutRelatedWeapons( entity player )
 {
-	TakeLoadoutRelatedWeapons(player) //(mk): This takes melee, but it's not given back here.
+	TakeLoadoutRelatedWeapons( player ) //(mk): This takes melee, but it's not given back here for 1v1.
 	
 	ItemFlavor character = LoadoutSlot_GetItemFlavor( ToEHI( player ), Loadout_CharacterClass() )
 	ItemFlavor tactical = CharacterClass_GetTacticalAbility( character )
@@ -521,7 +545,7 @@ void function GiveLoadoutRelatedWeapons( entity player )
 	player.GiveOffhandWeapon( CharacterAbility_GetWeaponClassname( tactical ), OFFHAND_TACTICAL, [] )
 	player.GiveOffhandWeapon( CharacterAbility_GetWeaponClassname( ultimate ), OFFHAND_ULTIMATE, [] )
 
-	if( !is1v1EnabledAndAllowed() || isScenariosMode() ) // Todo: unweave gamemode logic ()
+	if( !is1v1EnabledAndAllowed() && !isScenariosMode() ) // Todo: unweave gamemode logic ()
 	{
 		player.GiveWeapon( "mp_weapon_melee_survival", WEAPON_INVENTORY_SLOT_PRIMARY_2, [] )
 		player.GiveOffhandWeapon( "melee_pilot_emptyhanded", OFFHAND_MELEE, [] )
@@ -705,6 +729,9 @@ void function DecideRespawnPlayer( entity player, bool giveLoadoutWeapons = true
 	
 	// if( Gamemode() != eGamemodes.SURVIVAL && Gamemode() != eGamemodes.WINTEREXPRESS )
 		// player.Signal("OnRespawned")		
+		
+	foreach( callbackFunc in svGlobal.onPlayerRespawnedFinalCallbacks )
+		callbackFunc( player )
 }
 
 // clean up and move to main when completely debugged. Cafe
@@ -918,7 +945,7 @@ void function OnPlayerKilled( entity victim, entity attacker, var damageInfo )
 	if ( !IsValid( victim ) || !IsValid( attacker ) )
 		return
 	
-	if( is1v1EnabledAndAllowed() || Gamemode() == eGamemodes.fs_spieslegends )
+	if( file.bGamemodeIgnoresDespawnOrSuicide ) //is1v1EnabledAndAllowed() || Gamemode() == eGamemodes.fs_spieslegends || Playlist() == ePlaylists.fs_realistic_ttv ) 
 	{
 		int sourceId = DamageInfo_GetDamageSourceIdentifier( damageInfo )
 		
@@ -1455,6 +1482,24 @@ void function Flowstate_ApplyModifiedMovementToPlayer( entity player, bool reset
 
 	if( resetOnly )
 		return
+		
+	//(mk): Applying movement too closely on first spawn causes weird desync.
+	if( player.p.respawnCount == 0 )
+		thread __ApplyModifiedMovementDelayed_internal( player )
+	else 
+		__ApplyModifiedMovementDelayed_internal( player, false )
+}
+
+void function __ApplyModifiedMovementDelayed_internal( entity player, bool delayedAsThread = true )
+{
+	if( delayedAsThread )
+	{
+		if( !IsValid( player ) )
+			return
+			
+		player.EndSignal( "OnDeath", "OnDestroy" )
+		wait 1
+	}
 
 	switch( file.flowstate_modified_movement )
 	{

@@ -237,11 +237,13 @@ void function RiotShield_OnPlayerDamaged( entity victim, var damageInfo )
 		return
 
 	entity activeWeapon = victim.GetActiveWeapon( eActiveInventorySlot.mainHand )
-
+	
 	if ( !IsValid( activeWeapon ) )
 		return
 
-	printt( "ACTIVE WEAPON: " + activeWeapon )
+	#if DEVELOPER
+		printt( "ACTIVE WEAPON: " + activeWeapon )
+	#endif
 
 	string weaponName = activeWeapon.GetWeaponClassName()
 
@@ -255,11 +257,12 @@ void function RiotShield_OnPlayerDamaged( entity victim, var damageInfo )
 
 	float dot = DotProduct( damageToPlayer, viewForward )
 
-	printt( "DOT: " + dot )
+	#if DEVELOPER
+		printt( "DOT: " + dot )
+	#endif
 
 	if ( dot >= 0 )
 		DamageInfo_ScaleDamage( damageInfo, 0.0 )
-
 }
 
 entity function CreatePlayerShield( entity player, entity vortexWeapon )

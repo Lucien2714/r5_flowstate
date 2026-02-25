@@ -255,6 +255,7 @@ void function Script_RegisterAllStats()
 			Tracker_RegisterStat( "realistic_deaths", null, Tracker_ReturnDeaths )
 			Tracker_RegisterStat( "realistic_portals", null, TrackerStats_GetPortalPlacements, STORE_STAT )
 			Tracker_RegisterStat( "realistic_kidnaps", null, TrackerStats_GetPortalKidnaps, STORE_STAT )
+			Tracker_RegisterStat( "realistic_bot_kills", null, RealisticMode_GetBotKills, STORE_STAT )
 		break
 		
 		case ePlaylists.fs_grapples_n_guns:
