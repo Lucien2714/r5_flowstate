@@ -3610,7 +3610,7 @@ void function respawnInSoloMode( entity player, int respawnSlotIndex = -1 ) //å¤
 			if( stateFlags & STATE_FLAG_NO_DAMAGE )
 				player.e.stateFlags = stateFlags & ~STATE_FLAG_NO_DAMAGE
 			
-			if( player.GetMeleeDisabled() == 1 )
+			while( player.GetMeleeDisabled() > 0 )
 				player.ClearMeleeDisabled()
 		}
 	}

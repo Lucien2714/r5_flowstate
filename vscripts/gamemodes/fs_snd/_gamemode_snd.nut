@@ -2146,7 +2146,7 @@ array<ConsumableInventoryItem> function FlowStateGetAllDroppableItems( entity pl
 }
 
 
-void function CreateFlowStateDeathBoxForPlayer( entity victim, entity attacker, var damageInfo )
+void function CreateFlowStateDeathBoxForPlayer_SND( entity victim, entity attacker, var damageInfo )
 {
 	if(FlowStateGetAllDroppableItems( victim ).len() == 0) 
 		return

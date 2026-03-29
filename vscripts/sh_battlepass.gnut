@@ -615,7 +615,7 @@ array<BattlePassReward> function GetBattlePassBaseRewards( ItemFlavor pass )
 	return GetBattlePassLevelRewards( pass, 0 )
 }
 
-
+const bool DEBUG_REWARDS = false
 array<BattlePassReward> function GetBattlePassLevelRewards( ItemFlavor pass, int levelIndex, entity player = null )
 {
 	Assert( ItemFlavor_GetType( pass ) == eItemType.battlepass )
@@ -669,7 +669,9 @@ array<BattlePassReward> function GetBattlePassLevelRewards( ItemFlavor pass, int
 
 				rewardList.append( reward )
 			}
-			else Warning( "BattlePass reward is disabled: %s", string(rewardAsset) )
+			#if DEVELOPER && DEBUG_REWARDS
+				else Warning( "BattlePass reward is disabled: %s", string(rewardAsset) )
+			#endif
 		}
 		else Assert( rewardQty == 0, "Invalid BattlePass reward quantity for level " + levelIndex )
 

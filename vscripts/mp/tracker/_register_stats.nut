@@ -92,7 +92,7 @@ void function Tracker_ResyncStatForPlayer( entity playerToSync, string statKey )
 //	api backend. 								//
 //											  	//
 // For server-instance settings, register a   	//
-// setting with AddCallback_PlayerData()		//
+// setting with Tracker_RegisterPlayerData()		//
 //												//
 // Those settings will be unique to each server //
 // for each player.								//
@@ -483,7 +483,7 @@ void function Callback_CheckBadges( entity player )
 //	you can use RegisterAllSettings()					//
 //	however, you do not need to register settings		//
 //	manually, they will be registered when you add		//
-//	a callback via AddCallback_PlayerData()				//
+//	a callback via Tracker_RegisterPlayerData()				//
 //														//
 //////////////////////////////////////////////////////////
 
@@ -494,8 +494,8 @@ void function Script_RegisterAllPlayerDataCallbacks()
 	// Add a callback to register a setting to be loaded.
 	// Must be in the tracker backend.
 	//
-	// AddCallback_PlayerData( string setting, void functionref( entity player, string data ) callbackFunc )
-	// AddCallback_PlayerData( "setting", func ) -- omit second param or use null for no func. AddCallback_PlayerData( "setting" )
+	// Tracker_RegisterPlayerData( string setting, void functionref( entity player, string data ) callbackFunc )
+	// Tracker_RegisterPlayerData( "setting", func ) -- omit second param or use null for no func. Tracker_RegisterPlayerData( "setting" )
 	// void function func( entity player, string data )
 	//
 	// utility:
@@ -520,7 +520,10 @@ void function Script_RegisterAllPlayerDataCallbacks()
 	}
 	
 	if( Flowstate_EnableReporting() )
-		AddCallback_PlayerData( "cringe_report_data" )
+		Tracker_RegisterPlayerData( "cringe_report_data" )
+		
+	if( GetCurrentPlaylistVarBool( "timeout_enable", true ) )
+		Timeout_SetupPlayerDataCallbacks()
 		
 	//func
 }

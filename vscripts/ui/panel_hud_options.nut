@@ -60,6 +60,7 @@ void function InitHudOptionsPanel( var panel )
 	SetupSettingsButton( Hud_GetChild( contentPanel, "SwitchShowPos" ), "#HUD_SHOW_POS", "#HUD_SHOW_POS_DESC", $"rui/menu/settings/settings_hud" )
 	SetupSettingsButton( Hud_GetChild( contentPanel, "SwitchShowFPS" ), "#HUD_SHOW_FPS", "#HUD_SHOW_FPS_DESC", $"rui/menu/settings/settings_hud" )
 	SetupSettingsButton( Hud_GetChild( contentPanel, "SwitchShowDevWarning" ), "#HUD_SHOW_DEV_WARNING", "#HUD_SHOW_DEV_WARNING_DESC", $"rui/menu/settings/settings_hud" )
+	SetupSettingsButton( Hud_GetChild( contentPanel, "SwitchMovementOverlay" ), "#HUD_SHOW_MOVE_OVERLAY", "#HUD_SHOW_MOVE_OVERLAY_DESC", $"rui/menu/settings/settings_hud" )
 
 	AddPanelFooterOption( panel, LEFT, BUTTON_B, true, "#B_BUTTON_BACK", "#B_BUTTON_BACK" )
 	AddPanelFooterOption( panel, LEFT, BUTTON_BACK, true, "#BACKBUTTON_RESTORE_DEFAULTS", "#RESTORE_DEFAULTS", OpenConfirmRestoreHUDDefaultsDialog )
@@ -99,9 +100,12 @@ void function InitHudOptionsPanel( var panel )
 	file.conVarDataList.append( CreateSettingsConVarData( "cl_showpos_archived", eConVarType.INT ) )
 	file.conVarDataList.append( CreateSettingsConVarData( "cl_showfps_archived", eConVarType.INT ) )
 	file.conVarDataList.append( CreateSettingsConVarData( "show_dev_warning_dialogue", eConVarType.INT ) )
+	file.conVarDataList.append( CreateSettingsConVarData( "enable_movement_overlay", eConVarType.INT ) )
 
 	UpdateArchivedConvars() //(mk): Make sure archived settings are applied on initial ui load.
 	AddCallback_UiSettingsUpdated( UpdateArchivedConvars )
+	AddCallback_UiSettingsUpdated( UpdateLevelBasedFeatures_Settings )
+	AddUICallback_OnLevelInit( UpdateLevelBasedFeatures )
 }
 
 void function UpdateArchivedConvars() //(mk): the purpose of this is to use a script registered convar to control convars not marked as archive already present in the engine.
@@ -116,6 +120,27 @@ void function UpdateArchivedConvars() //(mk): the purpose of this is to use a sc
 		
 	if( currentShowFPSArchived != currentClShowFPS )
 		SetConVarInt( "cl_showfps", currentShowFPSArchived )
+}
+
+const string MOVEMENT_OVERLAY_SCRIPT_NAME = "ToggleMovementOverlay"
+void function UpdateLevelBasedFeatures_Settings()
+{
+	if( IsLobby() )
+		return
+
+	if( !CanRunClientScript() )
+		return
+	
+	bool currentEnableMovementOverlaySetting = GetConVarBool( "enable_movement_overlay" )
+	if( currentEnableMovementOverlaySetting )
+		RunClientScript( MOVEMENT_OVERLAY_SCRIPT_NAME, true )
+	else 
+		RunClientScript( MOVEMENT_OVERLAY_SCRIPT_NAME, false )
+}
+
+void function UpdateLevelBasedFeatures()
+{
+	UpdateLevelBasedFeatures_Settings()
 }
 
 void function OpenConfirmRestoreHUDDefaultsDialog( var button )
@@ -173,6 +198,7 @@ void function RestoreHUDDefaults()
 	SetConVarToDefault( "cl_showpos_archived" )
 	SetConVarToDefault( "cl_showfps_archived" )
 	SetConVarToDefault( "show_dev_warning_dialogue" )
+	SetConVarToDefault( "enable_movement_overlay" )
 
 	SaveSettingsConVars( file.conVarDataList )
 

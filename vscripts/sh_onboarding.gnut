@@ -987,15 +987,40 @@ void function OnPlayerKilled( entity victim, entity attacker, var damageInfo )
 		victim.SetObserverTarget( null )
 }
 
-void function ResetZiplineUseCountOnMantle( entity player )
+void function ServerToClientResetZiplineUseCountMantling( entity player )
 {
-	if( !IsValid( player ) )
+	if( player.p.ziplineUsages == 0 )
 		return
 	
-	//printt("Mantling, zipline use count reset.")
-	
-	player.p.ziplineUsages = 0
-	Remote_CallFunction_NonReplay( player, "ServerCallback_NessyMessage", 40 ) //why
+	if( !player.IsMantling() )
+		return 
+		
+	//printt( "Mantling, zipline use count reset." )	
+	__ResetZiplineCount( player )
+}
+
+void function ServerToClientResetZiplineUseCountGround( entity player )
+{
+	if( player.p.ziplineUsages == 0 )
+		return
+
+	if( player.IsWallHanging() )
+		return
+		
+	if( player.IsWallRunning() )
+		return
+		
+	if( !player.IsOnGround() )
+		return
+		
+	//printl( "Ground, zipline use count reset" )
+	__ResetZiplineCount( player )
+}
+
+void function __ResetZiplineCount( entity player )
+{
+	SetPlayerCanUseZipline( player, true ) //(mk): sets on server
+	//Remote_CallFunction_NonReplay( player, "ServerCallback_NessyMessage", 40 ) //sets on client
 }
 
 void function OnClientDisconnected( entity player )
@@ -1028,10 +1053,11 @@ void function OnClientConnected( entity player )
 		FlagSet( "MinPlayersReached" )
 
 	// Min players logic end
-	AddPlayerMovementEventCallback( player, ePlayerMovementEvents.MANTLE, ResetZiplineUseCountOnMantle )
+	AddPlayerMovementEventCallback( player, ePlayerMovementEvents.TOUCH_GROUND, ServerToClientResetZiplineUseCountGround )
+	AddPlayerMovementEventCallback( player, ePlayerMovementEvents.MANTLE, ServerToClientResetZiplineUseCountMantling )
 	UpdatePlayerCounts()
 	
-	GiveInitialTeamToPlayer(player)
+	GiveInitialTeamToPlayer( player )
 
 	if( GetCurrentPlaylistVarBool( "flowstate_give_random_custom_models_toall", false ) )
 		player.p.assignedCustomModel = RandomIntRangeInclusive(1,10)

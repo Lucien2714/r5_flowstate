@@ -222,6 +222,7 @@ Scripts:
 [
 	mp/tracker/commands.nut
 	mp/tracker/chat.nut
+	mp/tracker/_voteskipmap.nut
 	mp/tracker/timeout.nut
 	mp/tracker/utility.nut
 	mp/tracker/_internal.nut
@@ -820,6 +821,7 @@ Scripts:
 
 	client/rui/cl_weapon_status.gnut
 	client/rui/cl_custom_use_prompt.gnut
+	client/vgui/cl_overlay.nut
 
 	client/_cl_model_viewer.nut
 	client/cl_passives.gnut

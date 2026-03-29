@@ -73,6 +73,7 @@ global function EndRound
 global function PrimaryWeaponMetagame_Init
 global function FS_GiveRandomMelee
 global function IsHeirloomRegistered
+global function Flowstate_ForceMapChange
 #if DEVELOPER
 	global function DEV_NextRound
 #endif
@@ -95,6 +96,8 @@ global function ClientCommand_GiveWeapon
 global function ValidateWeaponTgiveSettings
 global function GetCommunityHeirlooms
 global function FS_InitCommunityHeirlooms
+
+global function CreateFlowStateDeathBoxForPlayer
 
 
 const string WHITE_SHIELD = "armor_pickup_lv1"
@@ -202,6 +205,8 @@ struct
     array<int> mapVotes
     array<int> mapIds
     int mappicked = 0
+	bool forceRoundMapChange = false
+	
 } FS_DM
 
 // ██████   █████  ███████ ███████     ███████ ██    ██ ███    ██  ██████ ████████ ██  ██████  ███    ██ ███████
@@ -332,6 +337,14 @@ bool function Flowstate_IsRealisticMode()
 void function ResetLoadedWeapons( entity player )
 {
 	ClientCommand_ResetSavedWeapons( player, [] )
+}
+
+bool function Flowstate_ForceMapChange( bool ornull setting = null )
+{
+	if( setting != null )
+		FS_DM.forceRoundMapChange = expect bool ( setting )
+		
+	return FS_DM.forceRoundMapChange
 }
 
 array<string> function ReturnChatArray()
@@ -1301,9 +1314,9 @@ void function _OnPlayerDied( entity victim, entity attacker, var damageInfo )
 				Remote_CallFunction_ByRef( victim, "ForceScoreboardLoseFocus" )
 				
 				//(mk): I originally intended this to be apart of a lifestate change or YouDied callback, and setting UpdateNextRespawnTime( entity player, float time ), client using: GetNextRespawnTime( player )  but due to various mode behavior, it's better left as a remote func call.
-				Remote_CallFunction_Replay( victim, "Flowstate_ShowRespawnTimeUI", int( DEATHCAM_TIME_SHORT + decidedWaitTime ) )//+ DEATHCAM_TIME_SHORT ) )
+				Remote_CallFunction_NonReplay( victim, "Flowstate_ShowRespawnTimeUI", int( DEATHCAM_TIME_SHORT + decidedWaitTime ) )//+ DEATHCAM_TIME_SHORT ) )
 
-				if( flowstateSettings.is_halo_gamemode || flowstateSettings.bIsRealisticMode )
+				if( flowstateSettings.is_halo_gamemode )// || flowstateSettings.bIsRealisticMode )
 				{
 					SURVIVAL_Death_DropLoot( victim, damageInfo ) //(mk):this wait threads inside.
 					
@@ -2712,6 +2725,18 @@ array<ConsumableInventoryItem> function FlowStateGetAllDroppableItems( entity pl
 	return final
 }
 
+const array<int> INVALID_INV_ITEM_FOR_DEATHBOX =
+[
+	44, 
+	45, 
+	46, 
+	47, 
+	48, 
+	53, 
+	54, 
+	55, 
+	56
+]
 
 void function CreateFlowStateDeathBoxForPlayer( entity victim, entity attacker, var damageInfo )
 {
@@ -2720,13 +2745,12 @@ void function CreateFlowStateDeathBoxForPlayer( entity victim, entity attacker, 
 	foreach ( invItem in FlowStateGetAllDroppableItems( victim ) )
 	{
 		//Message(victim,"DEBUG", invItem.type.tostring(), 10)
-		if( invItem.type == 44 || invItem.type == 45 || invItem.type == 46 || invItem.type == 47 || invItem.type == 48 || invItem.type == 53 || invItem.type == 54 || invItem.type == 55 || invItem.type == 56 )
+		if( INVALID_INV_ITEM_FOR_DEATHBOX.contains( invItem.type ) )
 		    continue
-		else{
-		    LootData data = SURVIVAL_Loot_GetLootDataByIndex( invItem.type )
-		    entity loot = SpawnGenericLoot( data.ref, deathBox.GetOrigin(), deathBox.GetAngles(), invItem.count )
-		    AddToDeathBox( loot, deathBox )
-		}
+			
+		LootData data = SURVIVAL_Loot_GetLootDataByIndex( invItem.type )
+		entity loot = SpawnGenericLoot( data.ref, deathBox.GetOrigin(), deathBox.GetAngles(), invItem.count )
+		AddToDeathBox( loot, deathBox )
 	}
 
 	UpdateDeathBoxHighlight( deathBox )
@@ -2768,29 +2792,45 @@ entity function FlowState_CreateDeathBox( entity player, bool hasCard )
 		vector restPos = box.GetOrigin()
 		vector fallPos = restPos + < 0, 0, 54 >
 
-		thread (void function( entity box , vector restPos , vector fallPos) {
-			entity mover = CreateScriptMover( restPos, box.GetAngles(), 0 )
-			if ( IsValid( box ) )
+		thread
+		(
+			void function( entity box , vector restPos , vector fallPos ) 
+			{
+				entity mover = CreateScriptMover( restPos, box.GetAngles(), 0 )
+				
+				if ( IsValid( box ) )
 				{
-				box.SetParent( mover, "", true )
-				mover.NonPhysicsMoveTo( fallPos, 0.5, 0.0, 0.5 )
+					box.SetParent( mover, "", true )
+					mover.NonPhysicsMoveTo( fallPos, 0.5, 0.0, 0.5 )
 				}
-			wait 0.5
-			if ( IsValid( box ) )
-				mover.NonPhysicsMoveTo( restPos, 0.5, 0.5, 0.0 )
-			wait 0.5
-			if ( IsValid( box ) )
-				box.ClearParent()
-			if ( IsValid( mover ) )
-				mover.Destroy()
+				
+				wait 0.5
+				
+				if ( IsValid( box ) )
+					mover.NonPhysicsMoveTo( restPos, 0.5, 0.5, 0.0 )
+				
+				wait 0.5
+				
+				if ( IsValid( box ) )
+					box.ClearParent()
+				
+				if ( IsValid( mover ) )
+					mover.Destroy()
 
-		}) ( box , restPos , fallPos)
+			}
+			
+		)( box , restPos , fallPos )
 
-		thread (void function( entity box) {
-			wait 20
-			if(IsValid(box))
-				box.Destroy()
-		}) ( box )
+		thread
+		( 
+			void function( entity box ) 
+			{
+				wait 20
+				if( IsValid( box ) )
+					box.Destroy()
+			}
+			
+		)( box )
 	}
 
 	return box
@@ -3498,8 +3538,18 @@ void function SimpleChampionUI()
 		thread
 		(
 			void function()
-			{
+			{		
+				#if TRACKER
+					entity champion = GetChampion()
+					while( IsValid( champion ) && !Tracker_IsStatsReadyFor( champion ) )
+						WaitFrame()
+						
+					WaitEndFrame()
+				#endif
+				
 				SetChampionShowingState( true, Time() + SHORT_CHAMPION_CARD_TIME )
+				foreach( player in GetPlayerArray() )
+					Remote_CallFunction_ByRef( player, "Tracker_ShowChampion" )
 				
 				OnThreadEnd
 				(
@@ -3508,7 +3558,7 @@ void function SimpleChampionUI()
 						SetChampionShowingState( false )
 					}
 				)
-				
+							
 				WaitForChampionToFinish()
 			}
 		)()
@@ -3528,9 +3578,6 @@ void function SimpleChampionUI()
 	{
 		if( !IsValid( player ) ) 
 			continue
-		
-		if( presentChampion )
-			Remote_CallFunction_ByRef( player, "Tracker_ShowChampion" )
 			
 		FSDM_SetMatchPersistentVarsForPlayer( player ) //(mk): sets current round stats since we are about to clear that data.
 			
@@ -3850,12 +3897,6 @@ void function SimpleChampionUI()
 	
 	foreach( roundPlayer in GetPlayerArray() )
 		FSDM_SetMatchPersistentVarsForPlayer( roundPlayer )
-
-	PIN_RoundEnd( file.currentRound ) //must be after champion determined.
-	// wait (2) // Not required wait since we're already waiting above flowstateSettings.endgame_delay
-	WaitEndFrame()
-
-	// end ship
 	
 	////////////////////////////////
 	//////// 	SCORE BOARD 	////
@@ -3863,8 +3904,56 @@ void function SimpleChampionUI()
 
 	if( SCOREBOARD_ENABLE )
 	{
-		thread SendScoreboardToClient()
+		#if TRACKER 
+			if( bIs1v1Mode() )
+			{
+				foreach( player in GetPlayerArray() )
+				{				
+					PlayerMetrics pm 		= Tracker_StatsMetricsByUID( player.p.UID )
+					int subtractKills 		= pm.lock1v1Kills
+					int subtractDeaths 		= pm.lock1v1Deaths
+					int subtractDamage		= pm.lock1v1Damage.tointeger()
+						
+					int currentKills		= player.GetPlayerNetInt( "kills" )
+					int currentDeaths		= player.GetPlayerNetInt( "deaths" )
+					int currentDamage		= player.GetPlayerNetInt( "damage" )
+					
+					player.SetPlayerNetInt( "kills", maxint( 0, currentKills - subtractKills ) )
+					player.SetPlayerNetInt( "deaths", maxint( 0, currentDeaths - subtractDeaths ) )
+					player.SetPlayerNetInt( "damage", maxint( 0, currentDamage - subtractDamage ) )
+					
+					
+					const array<int> SKIP_PGS_FOR_MODE =
+					[
+						ePlaylists.fs_scenarios,
+						ePlaylists.fs_lgduels_1v1
+					]
+					
+					if( SKIP_PGS_FOR_MODE.contains( Playlist() ) )
+						continue
+					
+					currentKills 		= player.GetPlayerGameStat( PGS_KILLS )
+					currentDeaths		= player.GetPlayerGameStat( PGS_DEATHS )
+					currentDamage		= player.GetPlayerGameStat( PGS_ASSISTS ) //(mk): PGS_ASSISTS is used to display damage except for scenarios/lgduels . Todo: register custom pgs fields
+					
+					player.SetPlayerGameStat( PGS_KILLS, maxint( 0, currentKills - subtractKills ) )
+					player.SetPlayerGameStat( PGS_DEATHS, maxint( 0, currentDeaths - subtractDeaths ) )
+					player.SetPlayerGameStat( PGS_ASSISTS, maxint( 0, currentDamage - subtractDamage ) )
+				}
+			}
+		#endif
+
+		waitthread SendScoreboardToClient()
 	}
+	
+	////////////////////////////////
+	//////// 	SHIP STATS 		////
+	////////////////////////////////
+	wait 1
+	
+	PIN_RoundEnd( file.currentRound ) //must be after champion determined.
+	WaitEndFrame()
+	// end ship
 
 	if( file.currentRound == Flowstate_AutoChangeLevelRounds() && Flowstate_EnableAutoChangeLevel() && flowstateSettings.end_match_message )
 	{
@@ -3990,7 +4079,7 @@ void function SimpleChampionUI()
 	//////// 	ROUND OVER 	////////
 	////////////////////////////////
 		
-	if( file.currentRound == Flowstate_AutoChangeLevelRounds() && Flowstate_EnableAutoChangeLevel() )
+	if( file.currentRound == Flowstate_AutoChangeLevelRounds() && Flowstate_EnableAutoChangeLevel() || Flowstate_ForceMapChange() )
 	{
 		foreach( player in GetPlayerArray() )
 		{
@@ -4749,17 +4838,17 @@ string function GetBestPlayerName()
 	return champion
 }
 
-float function getkd(int kills, int deaths)
+float function getkd( int kills, int deaths )
 {
-
-	if(deaths == 0)
-		return kills.tofloat();
+	if( deaths == 0 )
+		return kills.tofloat()
 
 	float kd = kills.tofloat() / deaths.tofloat()
-	kd = kd*100
+	kd = kd * 100
 
-	int floorkd = int(floor(kd+0.5))
-	kd = (float(floorkd))/100
+	int floorkd = int( floor( kd + 0.5 ) )
+	kd = ( float( floorkd ) ) / 100
+	
 	return kd
 }
 
@@ -4770,7 +4859,7 @@ void function SendScoreboardToClient()
 		if ( !IsValid( sPlayer ) ) 
 			continue
 		
-		Remote_CallFunction_NonReplay(sPlayer, "ServerCallback_ClearScoreboardOnClient")
+		Remote_CallFunction_NonReplay( sPlayer, "ServerCallback_ClearScoreboardOnClient" )
 		
 		thread function() : ( sPlayer )
 		{
@@ -4779,15 +4868,24 @@ void function SendScoreboardToClient()
 				if ( !IsValid( player ) ) 
 					continue
 				
+				int subtractKills
+				int subtractDeaths
+				float subtractDamage
+				
+				#if TRACKER
+					PlayerMetrics pm 	= Tracker_StatsMetricsByUID( player.p.UID )
+					subtractDamage		= pm.lock1v1Damage
+				#endif
+				
 				PlayerInfo p
 				p.eHandle = player.GetEncodedEHandle()
 				p.score = player.GetPlayerGameStat( PGS_KILLS )
 				p.deaths = player.GetPlayerGameStat( PGS_DEATHS )
 				p.kd = getkd( p.score, p.deaths )
-				p.damage = int( player.p.playerDamageDealt)
-				p.lastLatency = int(player.GetLatency()* 1000)
+				p.damage = maxint( 0, int( player.p.playerDamageDealt - subtractDamage ) )
+				p.lastLatency = int( player.GetLatency() * 1000 )
 				
-				Remote_CallFunction_NonReplay(sPlayer, "ServerCallback_SendScoreboardToClient", p.eHandle, p.score, p.deaths, p.kd, p.damage, p.lastLatency)
+				Remote_CallFunction_NonReplay( sPlayer, "ServerCallback_SendScoreboardToClient", p.eHandle, p.score, p.deaths, p.kd, p.damage, p.lastLatency )
 			}
 		}()
 	}

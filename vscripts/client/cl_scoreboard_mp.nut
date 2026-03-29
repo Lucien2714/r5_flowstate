@@ -824,7 +824,7 @@ void function UpdateScoreboardForGamemode( entity player, var rowRui, var scoreH
 
 		case 1:
 			playerScore1Header = headers[ 0 ]
-			if (IsValid( player ))
+			if ( IsValid( player ) )
 			{
 				if( Gamemode() == eGamemodes.CUSTOM_CTF )
 					playerScore1 = player.GetPlayerNetInt( "captures" )

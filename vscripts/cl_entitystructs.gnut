@@ -187,6 +187,7 @@ global struct ClientPlayerStruct
 	EditorMode& selectedEditorMode
 	EditorMode ornull lastEditorMode
 	int ziplineUsages = 0
+	bool bIsMonitoringForZiplineMoveEvents
 	float delayeddamage
 	int needles = 0
 	bool ongoingneedlesexplode = false

@@ -49,7 +49,6 @@ void function ClientCodeCallback_PingSpecificType( entity player, string pingTyp
 		file.pingCallback( player, pingType )
 }
 
-
 void function SetCallback_PingSpecificType( void functionref( entity, string ) callback )
 {
 	Assert( file.pingCallback == null, "Ping callback already exists! Cannot have more than 1 ping callback" )

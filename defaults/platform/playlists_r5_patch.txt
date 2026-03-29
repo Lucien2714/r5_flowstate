@@ -404,7 +404,7 @@ playlists
 				enable_motd 									1		// Enables message of the day for server (defined at bottom of file in SECTION 4:  MOTD_TEXT )
 				
 				enable_loose_playername_comparison				0		// Allows codepaths that look for a playername to match based on partials.  
-				// For example: If a player is named "BobTheBuilder", /chal bob would match for any player with bob in their name. Likewise:  cc ban bob, would match for bob.
+				// For example: If a player is named "BobTheBuilder", /chal bob would match for any player with bob in their name. Likewise:  cc ban bob, would match for BobTheBuilder.
 				
 				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 				// This section is for configuring the new auto rotator. This is comma separated, lists of:
@@ -457,6 +457,14 @@ playlists
 				// Available: #player, #uid, #expires, #reason, #amount, #admin
 				timeout_message									"#player, you've been timedout by #admin.\nReason: #reason. \nExpires in: #expires"
 				timeout_expired_message							"#player, your timeout has expired."
+
+				///////////////////////////////////////////////////////////////////////////////////
+				//// Player Map Vote Skip													///////
+				///////////////////////////////////////////////////////////////////////////////////
+				map_skip_enabled								0 		// Allows players to type !skip to change to next configured map (if any)
+				map_skip_percentage_required					60		// Percentage of players required to vote to initiate map change. ( Will end the round first )
+				map_vote_decay_time								120		// Time in seconds votes no longer count towards a map skip 
+				map_vote_debounce_time							30		// Time in seconds a player must wait to use skip again ( prevents spammy server messages )
 
 				///////////////////////////////////////////////////////////////////////////////////
 				//// Aim Assist																///////

@@ -6157,3 +6157,16 @@ void function GiveMelee( entity player )
 	player.TakeOffhandWeapon( OFFHAND_MELEE )
 	player.GiveOffhandWeapon( "melee_pilot_emptyhanded", OFFHAND_MELEE, [] )
 }
+
+int function GetDisconnectingPlayerCount()
+{
+	int disconnectCount
+	
+	foreach( player in GetPlayerArray() )
+	{
+		if( player.p.isDisconnected )
+			disconnectCount++
+	}
+	
+	return disconnectCount
+}

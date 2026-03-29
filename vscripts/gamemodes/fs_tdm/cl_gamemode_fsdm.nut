@@ -669,17 +669,15 @@ void function Cl_OnResolutionChanged()
 
 	Flowstate_ShowRoundEndTimeUI( GetGlobalNetTime( "flowstate_DMRoundEndTime" ) )
 
-	entity player = GetLocalClientPlayer()
-
-	if( GetGlobalNetInt( "FSDM_GameState" ) == eTDMState.IN_PROGRESS && player.GetPlayerNetEnt( "FSDM_1v1_Enemy" ) != null )
+	if( g_bIs1v1GameType() )
 	{
-		FS_1v1_ToggleUIVisibility( true, player.GetPlayerNetEnt( "FSDM_1v1_Enemy" ) )
+		entity player = GetLocalClientPlayer()
+		if( GetGlobalNetInt( "FSDM_GameState" ) == eTDMState.IN_PROGRESS && player.GetPlayerNetEnt( "FSDM_1v1_Enemy" ) != null )
+			FS_1v1_ToggleUIVisibility( true, player.GetPlayerNetEnt( "FSDM_1v1_Enemy" ) )
 	}
 
 	if( Playlist() == ePlaylists.fs_1v1_coaching )
-	{
 		ReloadRecordingsList()
-	}
 }
 
 void function Flowstate_RoundEndTimeChanged( entity player, float old, float new, bool actuallyChanged )

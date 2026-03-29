@@ -6,12 +6,28 @@ global function CodeCallback_ZiplineMount
 
 void function CodeCallback_ZiplineMount( entity player, entity zipline )
 {
-	thread Chroma_ZiplineThread()
-	player.p.ziplineUsages++
-	thread ResetZiplineUsageDelayed( player )
+	// player.p.ziplineUsages++
+
+	// if( player.p.ziplineUsages == )
+		// SetPlayerCanUseZipline( player, false )
+	
+	// if( player.p.ziplineUsages <= 4 )
+	// {
+		// if( !player.p.bIsMonitoringForZiplineMoveEvents )
+		// {
+			// player.p.bIsMonitoringForZiplineMoveEvents = true //set before thread
+			// thread ResetZiplineUsageOnQualifiedMoveEvents( player, zipline )
+		// }
+	// }
+	
+	// if( ++player.p.ziplineUsages > 4 )
+		// return
+	
+	// thread Chroma_ZiplineThread()
 }
-/*
-void function CodeCallback_ZiplineStart( entity player, entity zipline )
+
+//(mk): These don't exist on our build for client, although it would be nice.
+/* void function CodeCallback_ZiplineStart( entity player, entity zipline )
 {
 }
 
@@ -21,5 +37,4 @@ void function CodeCallback_ZiplineMove( entity player, entity zipline )
 
 void function CodeCallback_ZiplineStop( entity player )
 {
-}
-*/
+} */

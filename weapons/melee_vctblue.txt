@@ -4,24 +4,14 @@ WeaponData
 {
 
 	// General
-	"printname"   								"Melee"
-	"shortprintname"							"Melee"
-	"description" 								"Description needed"
-	"longdesc"									"Description needed"
-
-	"menu_icon"									"rui/hud/common/melee_icon"
-	"hud_icon"									"rui/hud/common/melee_icon"
-
+	"printname"   								"MELEE_SKIN_VCT_BLUE_NAME"
+	"shortprintname"							"MELEE_SKIN_VCT_BLUE_NAME"
+	"description" 								"MELEE_SKIN_VCT_BLUE_NAME"
+	"longdesc"									"MELEE_SKIN_VCT_BLUE_NAME"
+	"menu_icon"									"rui/weapon_icons/r5/weapon_bolo"
+	"hud_icon"									"rui/weapon_icons/r5/weapon_bolo"
 	"weapon_type_flags"							"WPT_MELEE"
-	
-	// Models
-	"viewmodel"   									"mdl/Weapons/vctblue/vctblue_ptpov.rmdl"
-	"playermodel" 									"mdl/Weapons/vctblue_w/vctblue_w.rmdl"
-	
-	"OnWeaponActivate"							"OnWeaponActivate_vctblue"
-	//"OnWeaponDeactivate"						"OnWeaponDeactivate_melee_bolo_sword"
-
-	// FX
-	"impact_effect_table"							"melee_bolo"
+	"viewmodel"   								"mdl/Weapons/vctblue/vctblue_ptpov.rmdl"
+	"impact_effect_table" 						"melee_knife"
 }
 

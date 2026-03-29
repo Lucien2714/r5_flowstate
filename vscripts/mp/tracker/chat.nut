@@ -485,11 +485,19 @@ void function Chat_Init()
 void function Chat_RegisterPlayerData()
 {
 	#if TRACKER && HAS_TRACKER_DLL
-		AddCallback_PlayerData( "unmuteTime", SetUnmuteTime ) //must be before muted
-		AddCallback_PlayerData( "muted", MuteFromPersistence )
-		AddCallback_PlayerData( "muted_reason" )
+		Tracker_RegisterPlayerData( "unmuteTime", SetUnmuteTime )
+		Tracker_RegisterPlayerData( "muted_reason" )
+		Tracker_RegisterPlayerData( "muted" )
+		AddCallback_PlayerDataFullyLoaded( CheckForPersistenceMute )
 	#endif
 }
+
+#if TRACKER 
+	void function CheckForPersistenceMute( entity player )
+	{
+		MuteFromPersistence( player, Tracker_FetchPlayerData( player.p.UID, "muted" ) )
+	}
+#endif 
 
 bool function Chat_InMutedList( string uid )
 {

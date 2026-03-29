@@ -772,6 +772,9 @@ bool function GRX_IsItemOwnedByPlayer_AllowOutOfDateData( ItemFlavor flav, entit
 }
 bool function IsItemOwnedByPlayerInternal( ItemFlavor flav, entity player = null )
 {
+	if( IsCustomUnlock( flav ) )
+		return true
+
 	int grxMode = ItemFlavor_GetGRXMode( flav )
 
 	if ( grxMode == GRX_ITEMFLAVORMODE_NONE )
@@ -2861,5 +2864,15 @@ bool function GRX_IsItemCoveredByOfferRestrictions( ItemFlavor flav )
 	}
 
 	return false
+}
+
+const array<string> CUSTOM_UNLOCKED_REFS = //(mk): if this list grows large, make table and use ( ref in tbl ) within IsCustomUnlock()
+[
+	//"weapon_skin_flatline_legendary_03" //example
+]
+
+bool function IsCustomUnlock( ItemFlavor flavor )
+{
+	return CUSTOM_UNLOCKED_REFS.contains( ItemFlavor_GetHumanReadableRef( flavor ) )
 }
 #endif

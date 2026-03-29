@@ -46,7 +46,7 @@ void function Flowstate_LgDuels1v1_Init()
 	#if TRACKER && HAS_TRACKER_DLL
 		// if( Flowstate_IsLGDuels() ) //deprecated
 		// {
-		// 	AddCallback_PlayerData( "LgDuelsSetting", LgDuelLoadSettings )
+		// 	Tracker_RegisterPlayerData( "LgDuelsSetting", LgDuelLoadSettings )
 		// }	
 	#endif
 	

@@ -1,6 +1,7 @@
 untyped
 global function CodeCallback_RegisterClass_C_Player
 global function ServerCallback_ToggleDisabledWeaponType
+global function p
 
 var function CodeCallback_RegisterClass_C_Player()
 {
@@ -51,4 +52,19 @@ var function CodeCallback_RegisterClass_C_Player()
 void function ServerCallback_ToggleDisabledWeaponType( int weaponType, bool toggle )
 {
 	GetLocalClientPlayer().ToggleDisabledWeaponType_internal( weaponType, toggle )
+}
+
+entity function p( int index = 0 )
+{
+	array<entity> players 	= clone GetPlayerArray()
+	int playersMaxIndex 	= players.len() - 1
+
+
+	if( index > playersMaxIndex || index < 0 )
+	{
+		entity nullEnt
+		return nullEnt
+	}
+	
+	return players[ index ]
 }

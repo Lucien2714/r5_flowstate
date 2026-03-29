@@ -1356,29 +1356,73 @@ void function SetupAbilities()
 	#if UI
 	SetupDevCommand( "Bangalore Tactical", "give mp_weapon_grenade_bangalore" )
 	SetupDevCommand( "Bangalore Ultimate", "give mp_weapon_grenade_creeping_bombardment" )
+	SetupDevCommand( "Bangalore Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_ADRENALINE)" )
+	
+	SetupDevCommand( " ", "give dontgiveanything" ) // blank line so Octance is in the same column
+	
 	SetupDevCommand( "Bloodhound Tactical", "give mp_ability_area_sonar_scan" )
 	SetupDevCommand( "Bloodhound Ultimate", "give mp_ability_hunt_mode" )
+	SetupDevCommand( "Bloodhound Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_TRACKING_VISION)" )
+		
+	SetupDevCommand( " ", "give dontgiveanything" ) // blank line so Octance is in the same column
+	
 	SetupDevCommand( "Caustic Tactical", "give mp_weapon_dirty_bomb" )
 	SetupDevCommand( "Caustic Ultimate", "give mp_weapon_grenade_gas" )
+	SetupDevCommand( "Caustic Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_GAS_PROTECTION);script GivePassive(gp()[0], ePassives.PAS_GAS_GEAR)" )
+			
+	SetupDevCommand( " ", "give dontgiveanything" ) // blank line so Octance is in the same column
+	
 	SetupDevCommand( "Crypto Tactical", "give mp_ability_crypto_drone" )
 	SetupDevCommand( "Crypto Ultimate", "give mp_ability_crypto_drone_emp" )
+	SetupDevCommand( "Crypto Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_CRYPTO)" )
+			
+	SetupDevCommand( " ", "give dontgiveanything" ) // blank line so Octance is in the same column
+	
 	SetupDevCommand( "Gibraltar Tactical", "give mp_weapon_bubble_bunker" )
 	SetupDevCommand( "Gibraltar Ultimate", "give mp_weapon_grenade_defensive_bombardment" )
+	SetupDevCommand( "Gibraltar Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_ADS_SHIELD)" )
+			
+	SetupDevCommand( " ", "give dontgiveanything" ) // blank line so Octance is in the same column
+	
 	SetupDevCommand( "Lifeline Tactical", "give mp_weapon_deployable_medic" )
 	SetupDevCommand( "Lifeline Ultimate", "give mp_ability_care_package" )
+	SetupDevCommand( "Lifeline Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_MEDIC)" )
+			
+	SetupDevCommand( " ", "give dontgiveanything" ) // blank line so Octance is in the same column
+	
 	SetupDevCommand( "Mirage Tactical", "give mp_ability_holopilot" )
 	SetupDevCommand( "Mirage Ultimate", "give mp_ability_mirage_ultimate" )
+	SetupDevCommand( "Mirage Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_MIRAGE)" )
+	
 	SetupDevCommand( " ", "give dontgiveanything" ) // blank line so Octance is in the same column
+	
 	SetupDevCommand( "Octane Tactical", "give mp_ability_heal" )
 	SetupDevCommand( "Octane Ultimate", "give mp_weapon_jump_pad" )
+	SetupDevCommand( "Octane Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_OCTANE)" )
+			
+	SetupDevCommand( " ", "give dontgiveanything" ) // blank line so Octance is in the same column
+	
 	SetupDevCommand( "Pathfinder Tactical", "give mp_ability_grapple" )
 	SetupDevCommand( "Pathfinder Ultimate", "give mp_weapon_zipline" )
+	SetupDevCommand( "Pathfinder Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_PATHFINDER)" )
+			
+	SetupDevCommand( " ", "give dontgiveanything" ) // blank line so Octance is in the same column
+	
 	SetupDevCommand( "Wattson Tactical", "give mp_weapon_tesla_trap" )
 	SetupDevCommand( "Wattson Ultimate", "give mp_weapon_trophy_defense_system"  )
+	SetupDevCommand( "Wattson Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_BATTERY_POWERED)" )
+			
+	SetupDevCommand( " ", "give dontgiveanything" ) // blank line so Octance is in the same column
+	
 	SetupDevCommand( "Wraith Tactical", "give mp_ability_phase_walk" )
 	SetupDevCommand( "Wraith Ultimate", "give mp_weapon_phase_tunnel" )
+	SetupDevCommand( "Wraith Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_VOICES)" )
+			
+	SetupDevCommand( " ", "give dontgiveanything" ) // blank line so Octance is in the same column
+	
 	SetupDevCommand( "Revenant Tactical", "give mp_ability_silence" )
 	SetupDevCommand( "Revenant Ultimate", "give mp_ability_revenant_death_totem" )
+	SetupDevCommand( "Revenant Passive", "script TakeAllPassives( gp()[0] );script GivePassive(gp()[0], ePassives.PAS_DEATHSTALKER)" )
 	#endif
 }
 

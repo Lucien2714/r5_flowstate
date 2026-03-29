@@ -7,6 +7,7 @@ global function Timeout_SetPlayerTimedOut
 global function Timeout_PrintTimeoutData
 global function Timeout_GetDefaultTimeoutAmount
 global function Timeout_GetTimeoutExpiresTimestamp
+global function Timeout_SetupPlayerDataCallbacks
 
 global function CodeCallback_TimeoutCommand
 global function AddCallback_TimedOut
@@ -136,6 +137,7 @@ bool function Timeout_SetPlayerTimedOut( entity player, bool toggle = true, stri
 		player.p.bIsTimedOut = false
 		
 		__RunCallbacks( player, false )
+		SetTimeoutPersistence( player )
 		return true
 	}
 	
@@ -156,6 +158,13 @@ bool function Timeout_SetPlayerTimedOut( entity player, bool toggle = true, stri
 	SendServerMessageToPlayer( player, formatMessage, true )
 	
 	player.p.bIsTimedOut = true
+	SetTimeoutPersistence
+	(
+		player, 
+		timeoutData.iTimeoutExpiresTimestamp,
+		timeoutData.sReason,
+		timeoutData.sByPlayer
+	)
 	
 	if( iTimeoutAmount > 0 )
 		__CheckIsTimedOut( player ) //make sure we run the checker again
@@ -280,4 +289,64 @@ void function CodeCallback_TimeoutCommand( bool toggle, string criteria, int iTi
 		return 
 		
 	Timeout_SetPlayerTimedOut( candidate, toggle, fromWebPanelUser, iTimeoutAmount, reason )
+}
+
+void function Timeout_SetupPlayerDataCallbacks()
+{
+	#if TRACKER				
+		Tracker_RegisterPlayerData( "timeout_expires_timestamp" )
+		Tracker_RegisterPlayerData( "timeout_reason" )
+		Tracker_RegisterPlayerData( "timeout_issuer_name" )
+		
+		AddCallback_PlayerDataFullyLoaded( __CheckTimeoutPersistence )
+	#endif 
+}
+
+void function SetTimeoutPersistence( entity player, int expiresTimestamp = 0, string reason = "", string issuerName = "" )
+{
+	#if TRACKER
+		string uid = player.p.UID
+		
+		Tracker_SavePlayerData( uid, "timeout_expires_timestamp", expiresTimestamp )
+		Tracker_SavePlayerData( uid, "timeout_reason", reason )
+		Tracker_SavePlayerData( uid, "timeout_issuer_name", issuerName )
+	#endif
+}
+
+void function __CheckTimeoutPersistence( entity player )
+{
+	#if TRACKER
+		string uid 										= player.p.UID 
+		string persistentExpiresTimestampString 		= Tracker_FetchPlayerData( uid, "timeout_expires_timestamp" )
+		
+		if( persistentExpiresTimestampString == "" )
+			return
+		
+		if( !IsStringNumber( persistentExpiresTimestampString ) )
+		{
+			#if DEVELOPER 
+				printt( "[Timeout] Invalid upstream data for expires timestamp:", persistentExpiresTimestampString )
+			#endif 
+			
+			return 
+		}
+		
+		int persistentExpiresTimestamp 	= persistentExpiresTimestampString.tointeger()
+		int currentTimestamp 			= GetUnixTimestamp()
+		
+		if( persistentExpiresTimestamp > currentTimestamp )
+		{
+			string issuerName 	= Tracker_FetchPlayerData( uid, "timeout_issuer_name" )
+			string reason		= Tracker_FetchPlayerData( uid, "timeout_reason" )
+			
+			Timeout_SetPlayerTimedOut
+			(
+				player, 
+				true, 
+				issuerName, 
+				persistentExpiresTimestamp - currentTimestamp,
+				reason
+			)
+		}
+	#endif
 }

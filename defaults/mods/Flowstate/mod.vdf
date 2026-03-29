@@ -404,6 +404,18 @@
 				"max"		"30"
 			}
 		}
-		
+
+		"enable_movement_overlay"
+		{
+			"helpText" "Enables the movement overlay at bottom of screen."
+			"flags" 		"ARCHIVE|RELEASE"
+
+			"Values"
+			{
+				"default"	"0"
+				"min" 		"0"
+				"max"		"1"
+			}
+		}
 	}
 }

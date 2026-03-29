@@ -19,7 +19,10 @@ global function AddCallback_OnUseButtonPressed
 global function RemoveCallback_OnUseButtonPressed
 global function AddCallback_OnUseButtonReleased
 global function RemoveCallback_OnUseButtonReleased
-global function ResetZiplineUsageDelayed
+
+#if CLIENT
+	global function ResetZiplineUsageOnQualifiedMoveEvents
+#endif
 
 global function CodeCallback_ForceScriptError
 
@@ -70,6 +73,7 @@ global function CodeCallback_CanStartCustomWeaponActivity
 global function AddCallback_CanStartCustomWeaponActivity
 
 global function AddCallback_CanUseZipline
+global function SetPlayerCanUseZipline
 
 global typedef CanUseZiplineCallback bool functionref( entity player, entity zipline, vector ziplineClosestPoint )
 struct
@@ -96,14 +100,14 @@ void function AddCallback_CanUseZipline( CanUseZiplineCallback callbackFunc )
 	#else //CLIENT 
 		if( clGlobal.canUseZiplineCallbacks.contains( callbackFunc ) )
 	#endif 
-	{
-		mAssert
-		( 	
-			false, @"Tried to add function 
-			" + string( callbackFunc ) + 
-			"() but was already added with " + FUNC_NAME() 	
-		)
-	}
+		{
+			mAssert
+			( 
+				0, "Tried to add function %s() but was already added with %s", 
+				string( callbackFunc ),
+				FUNC_NAME() 	
+			)
+		}
 	
 	#if SERVER 
 		svGlobal.canUseZiplineCallbacks.append( callbackFunc )
@@ -221,38 +225,53 @@ bool function CodeCallback_CanUseEntity( entity player, entity ent )
 	return true
 }
 
-void function ResetZiplineUsageDelayed(entity player)
-{
-	if( !IsValid( player ) ) 
-		return
-	
-	Signal( player, "NewZiplineUse" )
-	EndSignal( player, "NewZiplineUse", "OnDestroy" )	
-	
-	OnThreadEnd
-	(
-		void function() : ( player )
-		{
-			if( !IsValid( player ) )
-				return 
-				
-			player.SetCanUseZipline( true )
-		}
-	)
-	
-	if( IsValid( player.Zipline_GetActiveZipline() ) && IsValid( player.Zipline_GetLastZipline() ) && player.Zipline_GetActiveZipline() != player.Zipline_GetLastZipline() )
-		return //onthredend handles
-	
-	float maxTime = Time() + ZIPLINES_COOLDOWN	
-	player.canUseZipline = false
-	
-	while( Time() < maxTime && !player.IsMantling() )
+#if CLIENT
+	void function ResetZiplineUsageOnQualifiedMoveEvents( entity player, entity zipline ) //(mk): deprecated
 	{
-		if( player.IsOnGround() && !player.IsWallHanging() && !player.IsWallRunning() )
-			break
-			
-		WaitFrame()
+		if( !IsValid( player ) ) 
+			return
+		
+		EndSignal( player, "NewZiplineUse", "OnDestroy", "OnDeath" )
+		clGlobal.levelEnt.EndSignal( "LocalClientPlayerRespawned" )		
+		
+		OnThreadEnd
+		(
+			void function() : ( player, zipline )
+			{
+				if( !IsValid( player ) )
+					return 	
+					
+				player.SetCanUseZipline( true )
+				player.p.bIsMonitoringForZiplineMoveEvents = false
+			}
+		)
+		
+		while( !player.IsMantling() )
+		{
+			if( player.IsOnGround() && !player.IsWallHanging() && !player.IsWallRunning() )
+				break
+				
+			if( IsNewZipline( player ) )
+				break 
+				
+			WaitFrame()
+		}
 	}
+#endif
+
+bool function IsNewZipline( entity player )
+{
+	return IsValid( player.Zipline_GetActiveZipline() ) && IsValid( player.Zipline_GetLastZipline() ) && player.Zipline_GetActiveZipline() != player.Zipline_GetLastZipline()
+}
+
+void function SetPlayerCanUseZipline( entity player, bool setting )
+{
+	player.SetCanUseZipline( setting )
+	
+	// #if CLIENT
+		// if( setting )
+			// Signal( player, "NewZiplineUse" )
+	// #endif 
 }
 
 const float ZIPLINE_MAX_USE_ANGLE = 35.0
@@ -261,7 +280,7 @@ bool function CodeCallback_CanUseZipline( entity player, entity zipline, vector 
 	if ( !IsValid( player ) )
 		return false
 	
-	if( !player.canUseZipline )		
+	if( !player.canUseZipline )	//&& !IsNewZipline( player )
 		return false
 	
 	if ( !player.IsHuman() )

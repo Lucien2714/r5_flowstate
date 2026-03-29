@@ -568,6 +568,7 @@
 		InheritProperties		SwitchButton
 		style					DialogListButton
 		navUp					SwitchShowFPS
+		navDown					SwitchMovementOverlay
 		ConVar					"show_dev_warning_dialogue"
 		list
 		{
@@ -578,6 +579,28 @@
 		visible                 1
 
 		pin_to_sibling			SwitchShowFPS
+		pin_corner_to_sibling	TOP_LEFT
+		pin_to_sibling_corner	BOTTOM_LEFT
+		childGroupAlways        ChoiceButtonAlways
+	}
+	
+	SwitchMovementOverlay
+	{
+		ControlName				RuiButton
+		InheritProperties		SwitchButton
+		style					DialogListButton
+		navUp					SwitchShowDevWarning
+		conCommand				"enable_movement_overlay"
+		ConVar					"enable_movement_overlay"
+		list
+		{
+			"#SETTING_OFF"	0
+			"#SETTING_ON"	1
+		}
+
+		visible                 1
+
+		pin_to_sibling			SwitchShowDevWarning
 		pin_corner_to_sibling	TOP_LEFT
 		pin_to_sibling_corner	BOTTOM_LEFT
 		childGroupAlways        ChoiceButtonAlways

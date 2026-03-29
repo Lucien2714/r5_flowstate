@@ -265,10 +265,11 @@ void function SV_CL_Init()
 		}
 		
 		if( Gamemode() == eGamemodes.CUSTOM_CTF )
-		{
 			RegisterNetworkedVariableChangeCallback_int( "FSDM_GameState", FSCTF_GameStateChanged )
-		}
+		
+		MovementOverlayInit()
 	#endif
+	
 	ModSystem_RunCallbacks()//MOD SYSTEM CALLBACK
 	RemoteFunctions_Init_Finish()
 }
@@ -395,6 +396,7 @@ void function Server_Init()
 	ObjectiveResourceSystem_ServerInit()
 	Chat_Init()
 	TimeoutInit()
+	MapSkip_Init()
 
 	LiveAPI_Init()
 	LootHelper_Init()

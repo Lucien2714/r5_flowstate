@@ -451,6 +451,13 @@ struct
 		/* (mk): 2/12/2026 */
 		
 		"#UNREGISTERED_HEIRLOOOM"
+		
+		/* (mk): 3/4/2026 */
+		
+		"#MAP_SKIP_INITIATED",
+		"#MAP_SKIP_VOTE_INSTRUCTIONS",	
+		"#MAP_SKIP_COMPLETE",
+		"#MAP_SKIP_CHANGE"
 	]
 	
 } file

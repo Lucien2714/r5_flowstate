@@ -745,20 +745,14 @@ function CreateZiplineJetEffects( entity player )
 }catch(e420){}
 }
 
-void function CodeCallback_ZiplineMount( entity player, entity zipline )
+void function CodeCallback_ZiplineMount( entity player, entity zipline ) //(mk): this should match client functionality in cl_zipline.gnut
 {
-	player.p.ziplineUsages++
-	
-	if( player.p.ziplineUsages == 3 )
-	{
-		thread ResetZiplineUsageDelayed( player )
+	if( player.p.ziplineUsages > 3 )
 		return
-	}
-		
+	
 	#if SERVER
 		EmitDifferentSoundsOnEntityForPlayerAndWorld( "player_zipline_attach", "3p_zipline_attach", player, player )		
 	#endif
-
 }
 
 void function CodeCallback_ZiplineStart( entity player, entity zipline )
@@ -799,8 +793,11 @@ void function CodeCallback_ZiplineStop( entity player )
 {
 	#if SERVER
 		if( !IsValid( player) )
-			return
+			return	
 		
+		if( ++player.p.ziplineUsages == 4 )
+			SetPlayerCanUseZipline( player, false ) //(mk): server has move events to reset on mantle/ground
+			
 		TrackingVision_CreatePOI( eTrackingVisionNetworkedPOITypes.PLAYER_TRAVERSAL_ZIPLINE_STOP, player, player.GetOrigin(), player.GetTeam(), player )
 	
 		foreach( effect in player.s.ziplineEffects )
