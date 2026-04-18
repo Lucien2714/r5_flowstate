@@ -2385,7 +2385,8 @@ playlists
 				//Lucien2714: limit player fight time, if the players exceeds the maximum fight time, they will be considered both lost and be sent back to waiting lobby.
 				max_fight_time									0
 				mnk_allowed										0
-				controller_allowed								0
+				controller_allowed								1
+
 				//Skip Intros:
 				character_select_time_min		  				0
 				character_select_time_max		  				0
@@ -2480,7 +2481,7 @@ playlists
 				// challenges ( settings for lock 1v1 )
 				///////////////////////////////////////
 				
-				enable_challenges								1
+				enable_challenges								0 
 				give_legend_tactical							0 //gives player tactical ability for legend on spawn
 				give_legend 									0 // allows giving legend ( during challenge only )
 				challenge_recap_server_message					1 //enables quick kill/death recap msg in chat (requires chat bot enabled in r5rdev_config.json)
