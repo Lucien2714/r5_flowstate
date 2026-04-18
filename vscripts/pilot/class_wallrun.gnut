@@ -90,8 +90,9 @@ function Wallrun_PlayerTookDamage( entity player, damageInfo, entity attacker )
 	
 	if( IsValid( weapon ) && SURVIVAL_Loot_IsRefValid( weapon.GetWeaponClassName() ) )
 		data0 = SURVIVAL_Loot_GetLootDataByRef( weapon.GetWeaponClassName() )
-
-
+	#if DEVELOPER
+	sqprint("Wallrun_PlayerTookDamage:\n Enabled Bulled Slowed:"+file.enable_bullet_slow+"\n lastTimeShotSlowApplied_Global:"+player.p.lastTimeShotSlowApplied_Global+"\nCurrentTime:"+Time()+"\nStatusEffect_GetSeverity( player, eStatusEffect.move_slow ):"+StatusEffect_GetSeverity( player, eStatusEffect.move_slow )+"\nIsValid( weapon ) && data0.lootType == eLootType.MAINWEAPON:"+IsValid( weapon ) && data0.lootType == eLootType.MAINWEAPON+"\n")
+	#endif
 	if( file.enable_bullet_slow 
 		&& !PlayerHasPassive(player, ePassives.PAS_FORTIFIED ) 
 		&& Time() >= player.p.lastTimeShotSlowApplied_Global + 3.0 
