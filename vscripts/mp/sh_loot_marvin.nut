@@ -1521,4 +1521,4 @@ void function SetTopPriorityLootMarvin( entity player )
 		wait 0.2
 	}
 }
-#endif 
+#endif

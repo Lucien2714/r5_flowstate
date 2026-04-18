@@ -866,6 +866,3 @@ float function GetPlaylistVar_ShadowHealthRegenDelay()
 {
 	return GetCurrentPlaylistVarFloat( "shadow_health_regen_delay", 6.0 )
 }
-
-                                   
- 

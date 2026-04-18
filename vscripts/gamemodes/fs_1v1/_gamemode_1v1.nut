@@ -965,10 +965,11 @@ void function Gamemode1v1_SetPlayerGamestate(entity player, int state = 0) {
 	callbackFunc(player, state)
 	// }
 	#if DEVELOPER && DEBUG_STATE
-	else if (!Gamemode1v1_IsPlayerInState(player, e1v1State.SEQUENCE)) {
-		DumpStack()
-		mAssert(false, format("State was already set to '%s' for %s", DEV_GetGamestateRef(state), string(player)))
-	}
+		// else if( !Gamemode1v1_IsPlayerInState( player, e1v1State.SEQUENCE ) )
+		// {
+		// 	DumpStack()
+		// 	mAssert( false, format( "State was already set to '%s' for %s", DEV_GetGamestateRef( state ), string( player ) ) )
+		// }
 	#endif
 }
 

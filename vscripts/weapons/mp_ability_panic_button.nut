@@ -407,4 +407,3 @@ void function SCB_DoPanicSkydiveFeedback()
 	EmitSoundOnEntity( GetLocalViewPlayer(), "dropship_mp_epilogue_warpout" )
 }
 #endif // CLIENT
- 

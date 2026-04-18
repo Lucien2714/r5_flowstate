@@ -1789,4 +1789,4 @@ vector function ClampViewVectorToMaxAngle( vector vec1, vector vec2, float angle
 	perpendicularVector.Normalize()
 	vector newVector = vec1 * deg_cos( angle ) + perpendicularVector * deg_sin( angle )
 	return newVector
-} 
+}
