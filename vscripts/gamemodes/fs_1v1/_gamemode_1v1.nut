@@ -174,6 +174,10 @@ struct {
 	//playerHandle -> struct resting
 	table < int, bool > soloPlayersResting = {}
 
+	//playerHandle -> struct resting
+	table < int, bool > soloPlayersInvalidInputMonitor = {}
+
+
 	bool APlayerHasMessage = false
 
 	array < ChallengesStruct > allChallenges
@@ -1535,6 +1539,54 @@ void function AddPlayerToWaitingList(soloPlayerStruct playerStruct) {
 
 }
 
+void function RefreshPlayerInputEligibility(entity player) {
+	if (!IsValid(player))
+		return
+
+	if (!isInputAllowed(player)) {
+		if (Gamemode1v1_IsPlayerWaiting(player))
+			Gamemode1v1_RemovePlayerFromWaitingList(player.p.handle)
+
+		// Clear any lingering queue/rest event toast before showing the invalid-input panel.
+		LocalMsg(player, "#FS_NULL", "", eMsgUI.EVENT, 1)
+		Gamemode1v1_SetPlayerGamestate(player, e1v1State.INVALID_INPUT)
+		Gamemode1v1_NotifyPlayer(player, eNotify.WAITING, "#FS_INPUT_NOT_ALLOWED")
+
+		#if DEVELOPER
+		sqprint(format("[RefreshPlayerInputEligibility] Player %s is using a disallowed input and was moved to INVALID_INPUT", player.GetPlayerName()))
+		#endif
+		return
+	}
+
+	if (Gamemode1v1_GetPlayerGamestate(player) != e1v1State.INVALID_INPUT)
+		return
+
+	ClearNotifications(player, eNotify.WAITING)
+
+	if (Gamemode1v1_IsPlayerResting(player)) {
+		Gamemode1v1_SetPlayerGamestate(player, e1v1State.RESTING)
+		#if DEVELOPER
+		sqprint(format("[RefreshPlayerInputEligibility] Player %s restored to RESTING after switching to an allowed input", player.GetPlayerName()))
+		#endif
+		return
+	}
+
+	if (!Gamemode1v1_IsPlayerWaiting(player))
+		soloModePlayerToWaitingList(player, false, true)
+}
+
+void function StartValidInputWatchdog(entity player) {
+	if (!IsValid(player))
+		return
+
+	int handle = player.p.handle
+	if (handle in file.soloPlayersInvalidInputMonitor)
+		return
+
+	file.soloPlayersInvalidInputMonitor[handle] <- true
+	thread ValidInputWatchdog(player)
+}
+
 void function Gamemode1v1_ForceRest(entity player) {
 	if (!file.bRestEnabled)
 		return
@@ -2590,11 +2642,14 @@ bool function ClientCommand_Maki_SoloModeRest(entity player, array < string > ar
 		// LocalMsg( player, "#FS_MATCHING" )
 		if(isInputAllowed(player)){
 			soloModePlayerToWaitingList(player, false, true)
-			#if DEVELKOPER
+			#if DEVELOPER
 			sqprint("Player was in resting list and is now moved to waiting list")
 			#endif
 		}
 		else{
+			//Player input invalid, set gamestate to InvalidInput.
+			Gamemode1v1_SetPlayerGamestate(player, e1v1State.INVALID_INPUT)
+			StartValidInputWatchdog(player)
 			#if DEVELOPER
 			sqprint("Player was in resting list but input is not allowed, so not moved to waiting list")
 			#endif
@@ -2761,17 +2816,30 @@ void function soloModePlayerToWaitingList(entity player, bool isWinner = false, 
 	if (!IsInvincible(player)) // (cafe) fix invincible stack bug
 		MakeInvincible(player)
 
-	if (!fromResting && !(Gamemode1v1_GetPlayerGamestate(player) == e1v1State.INVALID))
+	if (!fromResting && !(Gamemode1v1_GetPlayerGamestate(player) == e1v1State.INVALID) && !(Gamemode1v1_GetPlayerGamestate(player) == e1v1State.INVALID_INPUT))
+	{
 		Gamemode1v1_TeleportPlayer(player, g_waitingRoomSpawnLocations.getrandom()) //new
+		#if DEVELOPER
+		sqprint("[soloModePlayerToWaitingList] Player was not from resting list and was not in invalid/invalid input state, teleporting to waiting room spawn")
+		#endif
+	}
 
 	if (isInputAllowed(player) == false) {
 		Gamemode1v1_NotifyPlayer(player, eNotify.WAITING, "#FS_INPUT_NOT_ALLOWED")
+		// Avoid constantly trying to add player to queue list, which causes the player to constantly teleport in the waiting room.
+		Gamemode1v1_SetPlayerGamestate(player, e1v1State.INVALID_INPUT)
+		StartValidInputWatchdog(player)
 		#if DEVELOPER
-		sqprint("[soloModePlayerToWaitingList]Player input is not allowed, not adding to waiting list")
+		sqprint("[soloModePlayerToWaitingList] Player input is not allowed, not adding to waiting list")
 		#endif
 		return
 	}
-	Gamemode1v1_SetPlayerGamestate(player, e1v1State.WAITING)
+	else {
+		#if DEVELOPER
+		sqprint("[soloModePlayerToWaitingList] Player input is allowed, adding to waiting list")
+		#endif
+		Gamemode1v1_SetPlayerGamestate(player, e1v1State.WAITING)
+	}
 
 	player.SetMinimapZoomScale(0.75, 3.0) // (cafe) There should be a better place for this call
 
@@ -2830,7 +2898,7 @@ void function soloModePlayerToWaitingList(entity player, bool isWinner = false, 
 	FS_ClearRealmsAndAddPlayerToAllRealms(player)
 
 	if (!bIsCoachingMode()) {
-		Gamemode1v1_NotifyPlayer(player, eMsgUI.EVENT, isInputAllowed(player) ? "#FS_IN_QUEUE" : "#FS_INPUT_NOT_ALLOWED")
+		LocalMsg(player, "#FS_IN_QUEUE", "", eMsgUI.EVENT, settings.roundTime)
 		#if DEVELOPER
 		sqprint(format("[soloModePlayerToWaitingList] Player %s entered the queue. Input allowed: %s", player.GetPlayerName(), isInputAllowed(player) ? "true" : "false"))
 		#endif
@@ -2963,7 +3031,12 @@ void function scenarios_soloModePlayerToWaitingList(entity player, bool isWinner
 	//set realms for resting player
 	FS_ClearRealmsAndAddPlayerToAllRealms(player)
 
-	Gamemode1v1_NotifyPlayer(player,eMsgUI.EVENT, isInputAllowed(player) ? "#FS_IN_QUEUE" : "#FS_INPUT_NOT_ALLOWED")
+	//Gamemode1v1_NotifyPlayer(player,eMsgUI.EVENT, isInputAllowed(player) ? "#FS_IN_QUEUE" : "#FS_INPUT_NOT_ALLOWED")
+	if (isInputAllowed(player))
+		LocalMsg(player, "#FS_IN_QUEUE", "", eMsgUI.EVENT, settings.roundTime)
+	else
+		Gamemode1v1_NotifyPlayer(player, eNotify.WAITING, "#FS_INPUT_NOT_ALLOWED")
+
 	#if DEVELOPER
 	sqprint(format("Player %s entered the queue. Input allowed: %s", player.GetPlayerName(), isInputAllowed(player) ? "true" : "false"))
 	#endif
@@ -3121,7 +3194,7 @@ entity function CreateSmallRingBoundary(vector Center) {
 	vector smallRingCenter = Center
 	float smallRingRadius = 2000
 	entity smallcircle = CreateEntity("prop_script")
-	smallcircle.SetValueForModelKey($ "mdl/fx/ar_survival_radius_1x100.rmdl")
+	smallcircle.SetValueForModelKey($"mdl/fx/ar_survival_radius_1x100.rmdl")
 	smallcircle.kv.fadedist = 2000
 	smallcircle.kv.modelscale = smallRingRadius
 	smallcircle.kv.renderamt = 1
@@ -3657,7 +3730,7 @@ void function FS_1v1_MainLoop_THREAD(LocPair waitingRoomLocation) {
 			//IF IT'S NOT IN RESTING LIST, WAITING LIST OR IN SOLO MODE MEANS PLAYER JUST CONNECTED
 			//(cafe) This should be using OnPlayerConnected callback or something, but we need to make sure there is time for player to send start_in_rest_setting setting via client command so this way may ensure the required time for that
 			//(mk): Done, however leaving this here for now, and it should be removed when possible. This method below never worked for players who joined mid-game
-			if (!Gamemode1v1_IsPlayerResting(player) && !Gamemode1v1_IsPlayerWaiting(player) && GetTDMState() == eTDMState.IN_PROGRESS) {
+			if (!Gamemode1v1_IsPlayerResting(player) && !Gamemode1v1_IsPlayerWaiting(player) && !Gamemode1v1_IsPlayerInState(player, e1v1State.INVALID_INPUT) && GetTDMState() == eTDMState.IN_PROGRESS) {
 				if (!player.p.start_in_rest_setting) {
 					// #if DEVELOPER
 					// printw( "[1v1 THREAD] PLAYER CONNECTED, SENDING TO WAITING LIST" )
@@ -3684,7 +3757,9 @@ void function FS_1v1_MainLoop_THREAD(LocPair waitingRoomLocation) {
 						continue
 
 					Gamemode1v1_NotifyPlayer(solostruct.player, eNotify.WAITING, isInputAllowed(solostruct.player) ? "#FS_WAITING_PANEL" : "#FS_INPUT_NOT_ALLOWED")
-					sqprint(format("Player %s entered the queue. Input allowed: %s", solostruct.player.GetPlayerName(), isInputAllowed(solostruct.player) ? "true" : "false"))
+					#if DEVELOPER
+					sqprint(format("[1v1 THREAD MAIN LOOP NOTIFICATIONS]Player %s entered the queue. Input allowed: %s", solostruct.player.GetPlayerName(), isInputAllowed(solostruct.player) ? "true" : "false"))
+					#endif
 					SetShowWaitingMsg(solostruct.player, false) //prevent looped signals
 					file.APlayerHasMessage = true //thread should remove waiting for msg..
 				}
@@ -3740,6 +3815,7 @@ void function FS_1v1_MainLoop_THREAD(LocPair waitingRoomLocation) {
 		if (GetScoreboardShowingState() || GetChampionShowingState() || GetTDMState() != eTDMState.IN_PROGRESS)
 			continue
 
+
 		////////////////////////
 		// ACTUAL MATCHMAKING //
 		////////////////////////
@@ -3784,7 +3860,16 @@ void function FS_1v1_MainLoop_THREAD(LocPair waitingRoomLocation) {
 					continue
 
 				entity playerSelf = playerWaiting.player
+				if (!isInputAllowed(playerSelf)){
+					Gamemode1v1_SetPlayerGamestate(playerSelf, e1v1State.INVALID_INPUT)
+					Gamemode1v1_RemovePlayerFromWaitingList(playerSelf.p.handle)
+					StartValidInputWatchdog(playerSelf)
+					#if DEVELOPER
+					printw(format("[1v1 Main Thread (Challenge)]Player %s removed from queue due to invalid input method", playerSelf.GetPlayerName()))
+					#endif
 
+					continue
+				}
 				if (!bIsCoachingMode() && IsPlayerPendingChallenge(playerSelf)) {
 					entity Lock1v1Opponent = getLock1v1OpponentOfPlayer(playerSelf)
 					if (IsValid(Lock1v1Opponent)) {
@@ -3848,7 +3933,12 @@ void function FS_1v1_MainLoop_THREAD(LocPair waitingRoomLocation) {
 				if (IsValid(newGroup.player1)) {
 					if (!isInputAllowed(newGroup.player1)) {
 						Gamemode1v1_NotifyPlayer(newGroup.player1, eNotify.WAITING, "#FS_INPUT_NOT_ALLOWED")
-						sqprint(format("Player %s finished matchmaking. Input allowed: %s, ignored", newGroup.player1.GetPlayerName(), isInputAllowed(newGroup.player1) ? "true" : "false"))
+						Gamemode1v1_SetPlayerGamestate(newGroup.player1, e1v1State.INVALID_INPUT)
+						Gamemode1v1_RemovePlayerFromWaitingList(newGroup.player1.p.handle)
+						StartValidInputWatchdog(newGroup.player1)
+						#if DEVELOPER
+						sqprint(format("[1v1 Main Thread (IBMM Timeout)]Player %s finished matchmaking. Input allowed: %s, ignored", newGroup.player1.GetPlayerName(), isInputAllowed(newGroup.player1) ? "true" : "false"))
+						#endif
 						continue
 					}
 					//sqprint("Player 1 found: " + newGroup.player1.GetPlayerName() + " waiting for same input or IBMM grace period time out")
@@ -3884,7 +3974,10 @@ void function FS_1v1_MainLoop_THREAD(LocPair waitingRoomLocation) {
 					table < entity, float > properOpponentTable
 					//Disable Match making for certain inputs.
 					if (!isInputAllowed(playerSelf)) {
-						Gamemode1v1_NotifyPlayer(newGroup.player1, eNotify.WAITING, "#FS_INPUT_NOT_ALLOWED")
+						Gamemode1v1_NotifyPlayer(playerSelf, eNotify.WAITING, "#FS_INPUT_NOT_ALLOWED")
+						Gamemode1v1_SetPlayerGamestate(playerSelf, e1v1State.INVALID_INPUT)
+						Gamemode1v1_RemovePlayerFromWaitingList(playerSelf.p.handle)
+						StartValidInputWatchdog(playerSelf)
 						continue
 					}
 					foreach(opponentHandle, eachOpponentPlayerStruct in file.soloPlayersWaiting) {
@@ -4751,6 +4844,7 @@ void function Thread_CheckInput(entity player) {
 						//sqprint("Player did change input! Old: " + player.p.input.tostring() + " - New: " + typeOfInput.tostring());
 						player.p.input = typeOfInput
 						player.p.lastInputChangeTime = Time()
+						RefreshPlayerInputEligibility(player)
 						player.Signal("InputChanged") //registered signal in CPlayer class
 					}
 					continue
@@ -5066,7 +5160,6 @@ void function OnTimeout(entity player, bool status) {
 	CommandsEnabled(player, true)
 	LocalMsg(player, "#FS_UNTIMEOUT", "", eMsgUI.EVENT, settings.roundTime)
 }
-
 bool function isInputAllowed(entity player) {
 	if (!IsValid(player))
 		return false
@@ -5081,4 +5174,68 @@ bool function isInputAllowed(entity player) {
 	}
 
 	return true
+}
+
+void function ValidInputWatchdog(entity player) {
+	#if DEVELOPER
+	sqprint(format("THREAD FOR ValidInputWatchdog STARTED - Waiting for input to change"))
+	#endif
+
+	int handle = player.p.handle
+	EndSignal(player, "InputChanged", "OnDeath", "OnDisconnected")
+
+	OnThreadEnd
+		(
+			function(): (player, handle) {
+				#if DEVELOPER
+				sqprint("[ValidInputWatchdog] Thread ended for player", player.GetPlayerName())
+				#endif
+
+				if (handle in file.soloPlayersInvalidInputMonitor)
+					delete file.soloPlayersInvalidInputMonitor[handle]
+
+				// We check if the player is valid and is using the allowed input after the player triggered the InputChanged signal.
+				if(IsValid(player)){
+					if (isInputAllowed(player)) {
+						#if DEVELOPER
+						sqprint(format("[ValidInputWatchdog] Player %s has a valid input device. Putting player back to rest state", player.GetPlayerName()))
+						#endif
+
+						if (file.bRestEnabled){
+							if (Gamemode1v1_IsPlayerResting(player)) {
+								#if DEVELOPER
+								sqprint(format("[ValidInputWatchdog] Player %s is already in resting list, restoring RESTING gamestate", player.GetPlayerName()))
+								#endif
+								Gamemode1v1_SetPlayerGamestate(player, e1v1State.RESTING)
+							}
+							else {
+								#if DEVELOPER
+								sqprint(format("[ValidInputWatchdog] Rest enabled, forcing player %s to rest state", player.GetPlayerName()))
+								#endif
+								Gamemode1v1_ForceRest(player)
+							}
+							#if DEVELOPER
+							sqprint(format("[ValidInputWatchdog] Player %s now state: %s", player.GetPlayerName(),Gamemode1v1_GetPlayerGamestate(player).tostring() ))
+							#endif
+						}
+						else{
+							#if DEVELOPER
+							sqprint(format("[ValidInputWatchdog] Rest not enabled, putting player %s to waiting list", player.GetPlayerName()))
+							#endif
+							soloModePlayerToWaitingList(player, false, true)
+						}
+
+					}
+					else {
+						#if DEVELOPER
+						sqprint(format("[ValidInputWatchdog] Player %s is still using an invalid input device after triggering InputChanged. Creating another watchdog thread for this player.", player.GetPlayerName()))
+						#endif
+						StartValidInputWatchdog(player)
+					}
+				}
+
+			}
+		)
+
+	WaitForever()
 }
